@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editing Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>Editing demo</h1>
+    <label>Signed in as
+      <select id="user" aria-label="Demo user">
+        <option value="alice">Alice</option>
+        <option value="bob">Bob</option>
+        <option value="carol">Carol</option>
+      </select>
+    </label>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Upload</h2>
+      <form id="upload">
+        <input id="file" type="file" accept=".docx,.xlsx,.pptx,.pdf" required aria-label="File to upload">
+        <button type="submit">Upload</button>
+        <span id="upload-status" role="status"></span>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Files</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Editing now</th><th>Versions</th><th></th></tr></thead>
+        <tbody id="files"><tr><td colspan="4" class="muted">No files yet — upload a .docx to start.</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="card" id="history" hidden>
+      <h2>History — <span id="history-name"></span></h2>
+      <ol id="versions"></ol>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

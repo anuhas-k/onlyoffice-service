@@ -1,0 +1,1 @@
+/home/anuhas/projects/word-editor-zkp/demo/src/main.js # process entrypoint (3 lines: loadConfig → buildApp → listen); config and app are unit-tested, startup verified by the stack smoke

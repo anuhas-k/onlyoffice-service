@@ -1,0 +1,28 @@
+# Demo slice — editing service + ONLYOFFICE Document Server. Run with ./up.sh (creates .env with random secrets).
+services:
+  app:
+    build: .
+    environment:
+      DS_JWT_SECRET: ${DS_JWT_SECRET:?run ./up.sh to create .env}
+      APP_SECRET: ${APP_SECRET:?run ./up.sh to create .env}
+      DS_PUBLIC_URL: http://localhost:8080        # what the browser uses
+      DS_INTERNAL_URL: http://documentserver      # what the app uses
+      APP_INTERNAL_URL: http://app:3000           # what the Document Server uses
+    ports: ["3000:3000"]
+    volumes: ["demo-data:/data"]
+    depends_on: [documentserver]
+
+  documentserver:
+    image: onlyoffice/documentserver:8.2.2
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${DS_JWT_SECRET:?run ./up.sh to create .env}
+      JWT_HEADER: Authorization
+      ALLOW_PRIVATE_IP_ADDRESS: "true"   # lets the DS download from app:3000 on the Docker network (SPEC Risk R1)
+    ports: ["8080:80"]
+    volumes: ["ds-data:/var/www/onlyoffice/Data", "ds-cache:/var/lib/onlyoffice"]
+
+volumes:
+  demo-data:
+  ds-data:
+  ds-cache:
