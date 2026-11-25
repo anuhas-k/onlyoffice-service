@@ -59,7 +59,7 @@ Source of requirements: `docs/SRS.md` v0.1 · Task index: `STATUS.md` § Task Li
 | FR-048 | Versions are immutable | Must | Test + Inspection | TASK-003, TASK-005 | TASK-003 suite<br>TASK-005 suite | — | Planned |
 | FR-049 | Encrypt per file | Must | Test + Inspection | TASK-005 | TASK-005 suite | — | Planned |
 | FR-050 | Crypto-shred on delete | Must | Test | TASK-005, TASK-019, TASK-022 | TASK-005 suite<br>TASK-022 suite<br>`tests/modules/files/delete.test.ts` | — | Planned |
-| FR-051 | Proofs survive deletion | Must | Test | TASK-020 | `tests/modules/anchoring/api.test.ts` | — | Planned |
+| FR-051 | Proofs survive deletion | Must | Test | TASK-005, TASK-020 | TASK-005 suite<br>`tests/modules/anchoring/api.test.ts` | — | Planned |
 | FR-052 | Record post-save work atomically | Must | Test | TASK-005, TASK-011, TASK-020 | TASK-005 suite<br>TASK-011 suite<br>`tests/modules/anchoring/outbox.test.ts` | — | Planned |
 | FR-053 | Hourly per-tenant roots | Must | Test | TASK-003, TASK-020, TASK-022 | TASK-003 suite<br>TASK-022 suite<br>`tests/modules/anchoring/batch.test.ts` | — | Planned |
 | FR-054 | Salted leaves | Must | Test | TASK-005, TASK-020 | TASK-005 suite<br>`tests/modules/anchoring/merkle.test.ts` | — | Planned |
@@ -74,7 +74,7 @@ Source of requirements: `docs/SRS.md` v0.1 · Task index: `STATUS.md` § Task Li
 | NFR-007 | Security: no cross-file or cross-tenant leakage | — | Test (property-based + negative) | TASK-010 | TASK-010 suite | — | Planned |
 | NFR-008 | Security: secrets never logged | — | Test (capture all logs over a full end-to-end run; search for every issued secret) | TASK-001, TASK-023 | `tests/e2e/log-secrets.test.ts`<br>`tests/foundation/logger.test.ts` | — | Planned |
 | NFR-009 | Security: encryption at rest | — | Test + Inspection | TASK-005 | TASK-005 suite | — | Planned |
-| NFR-010 | Security: input validation | — | Test (malformed input per operation) | TASK-001 | `tests/foundation/errors.test.ts` | — | Planned |
+| NFR-010 | Security: input validation | — | Test (malformed input per operation) | TASK-001, TASK-023 | `tests/e2e/malformed-input.test.ts`<br>`tests/foundation/errors.test.ts` | — | Planned |
 | NFR-011 | Maintainability: storage seam | — | Inspection + Test (gateway contract tests run against the local implementation) | TASK-005 | `tests/modules/storage/contract.test.ts` | — | Planned |
 | NFR-012 | Maintainability: test coverage | — | Inspection | TASK-001 | TASK-001 suite | — | Planned |
 | NFR-013 | Flexibility: scale-out readiness | — | Test | TASK-006 | `tests/modules/ds-client/command.test.ts` | — | Planned |

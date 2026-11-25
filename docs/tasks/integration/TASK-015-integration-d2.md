@@ -51,6 +51,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 
 ## Acceptance
 - Every D2 endpoint documented and present
+- Two browser windows (Chromium, Firefox) co-edit one file through the test UI on the compose stack; closing both creates one milestone (moved from TASK-014, plan-check G8)
 - Local deploy check passes for D2
 
 ## Out of scope

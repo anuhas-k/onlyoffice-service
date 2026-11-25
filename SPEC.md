@@ -194,6 +194,7 @@ Callback status handling is fixed by ADR D2 (table "Status → Action").
 - `undici` (bundled `fetch`) — callback downloads and command-service calls.
 - Node `crypto` — AES-256-GCM, HMAC, SHA-256 (no extra crypto library).
 - `vitest`, `fast-check`, `testcontainers` — tests.
+- `@playwright/test` — test-UI browser tests (Chromium + Firefox).
 
 ### Performance Constraints
 

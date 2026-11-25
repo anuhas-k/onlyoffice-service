@@ -55,6 +55,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 ## Acceptance
 - Each uniqueness rule in SRS §3.4 is refused by the database (one test per rule)
 - UPDATE of a committed version's content/hash/blob_path is refused by the database
+- The immutability trigger still allows `versions.salt` to be set to NULL (crypto-shred, plan-check G5)
 - `retention-runs`: n/a — checkpoint purge deferred (SRS TBD-004)
 
 ## Out of scope

@@ -28,7 +28,12 @@
 | 7 | Conflict version when base ≠ head (FR-040) | ADR D4 | `tests/modules/callback/conflict.test.ts` |
 
 ## Files — owned exclusively by this task
-- `src/modules/callback/` (create)
+- `src/modules/callback/callback.routes.ts` (create)
+- `src/modules/callback/callback.service.ts` (create)
+- `src/modules/callback/trust.ts` (create)
+- `src/modules/callback/status-handlers.ts` (create — TASK-017 later extends status 1)
+- `src/modules/callback/download.ts` (create)
+- `src/modules/callback/index.ts` (create)
 - `tests/modules/callback/` (create)
 
 ## Progress — tick each box the moment it is true (FCT-M); `task.py done` refuses an open box
@@ -58,6 +63,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 
 ## Acceptance
 - Forged JWT / unknown key / foreign host → nothing created, foreign host never contacted
+- Callback for a key whose file is deleted → 404 UnknownDocumentKey (not 500), so the Document Server stops retrying (FR-050, plan-check G6)
 - Replayed status-2 → `{"error":0}`, version count unchanged
 - DB down during status 2 → 500; retry after recovery → exactly one version
 - Status-2 for a 10 MB file handled p95 < 5 s (NFR-002) measured in an integration test

@@ -50,6 +50,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 ## Acceptance
 - Service stopped while users close → recovered version ≤ 6 min after restart (fault-injection test)
 - Second run creates nothing
+- A forgotten document whose file is deleted is skipped and logged, never retried (FR-050, plan-check G6)
 
 ## Out of scope
 - Job registration (TASK-022)

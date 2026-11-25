@@ -5,6 +5,7 @@
 **Kind:** batch (3 units)   **Tier:** medium (SE-N)
 **Satisfies:** FR-056 (part), FR-014, FR-016 (demonstration)
 **Skills:** clean-code, bug-prevention, frontend-engineer
+**Test runner:** Playwright — `docs/PATTERNS.md` § SE notes, Note 1
 **Sabotage:** none — static dev UI, no security rule of its own
 **Status, dependencies, drop:** see `STATUS.md` → TASK-014
 
@@ -26,6 +27,8 @@
 - `public/index.html` (create)
 - `public/app.js` (create)
 - `public/styles.css` (create)
+- `playwright.config.ts` (create)
+- `package.json` (edit — add `@playwright/test` devDependency + `test:ui` script)
 - `tests/ui/` (create)
 
 ## Progress — tick each box the moment it is true (FCT-M); `task.py done` refuses an open box
@@ -50,7 +53,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 - [ ] No file outside `## Files` touched; no TODO / placeholder left
 
 ## Acceptance
-- Two browser windows (Chrome, Firefox) can co-edit one file through the UI
+- Each UI spec passes in Chromium and Firefox against a `page.route()`-stubbed API (PATTERNS SE note 1)
 - No download control visible during editing
 
 ## Out of scope

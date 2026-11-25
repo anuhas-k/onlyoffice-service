@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-11-25T00:00:00Z",
+  "score": 10.0,
+  "computed_score": 10.0,
+  "verdict": "PASS",
+  "acs_total": 16,
+  "acs_satisfied": 16,
+  "gap_count": 2,
+  "blocking_gaps": [],
+  "residual_non_blocking": ["R1", "R2"],
+  "hard_blocks_triggered": []
+}

@@ -3,7 +3,7 @@
 
 **Category:** backend
 **Kind:** batch (5 units)   **Tier:** large (SE-N)
-**Satisfies:** FR-048, FR-049, FR-050 (destroy-key primitive), FR-052 (outbox row in same commit), FR-054 (salt), NFR-009, NFR-011
+**Satisfies:** FR-048, FR-049, FR-050 (destroy-key primitive), FR-051 (salts destroyed on shred), FR-052 (outbox row in same commit), FR-054 (salt), NFR-009, NFR-011
 **Skills:** clean-code, bug-prevention, backend-engineer, security-engineer, pbt
 **Sabotage:** required — envelope encryption, key wrapping and key destruction are crypto rules
 **Design:** Each file gets a random 256-bit data key, stored only wrapped (AES-256-GCM under MASTER_KEY, unique nonce). Blobs: AES-256-GCM, fresh 96-bit nonce per blob, auth tag verified on read — a failed tag is an error, never partial plaintext. `commitVersion` writes blob → then, in ONE transaction, version row (+ random per-version salt) + participants + outbox row; duplicate (file, key, hash) or hash == head returns `{created:false}` with the existing id. `destroyKey` nulls the wrapped key and salts and sets destroyed_at; reads after it fail with FileDeleted. Temp plaintext files are deleted in `finally`. No other module touches the blob volume.
@@ -57,6 +57,7 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 - A tampered blob fails to decrypt with an error
 - Same (file, key, hash) committed twice → one version
 - After destroyKey no version decrypts even with MASTER_KEY
+- After destroyKey every version's leaf salt is null (FR-051 / SRS §3.4, plan-check G5)
 
 ## Out of scope
 - HTTP routes
