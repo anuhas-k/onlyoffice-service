@@ -2,6 +2,8 @@
 
 A throwaway slice that proves the core loop: upload a file, open it in two browser windows, edit together, close, get a version. The real service is the factory build on `feature/onlyoffice-prototype`.
 
+**API reference and handover guide:** [API-v0.1.0.md](API-v0.1.0.md)
+
 ## Run
 
 ```bash
