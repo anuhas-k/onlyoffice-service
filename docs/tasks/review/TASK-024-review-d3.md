@@ -1,0 +1,57 @@
+# TASK-024 — Review: drop D3
+<!-- One task = one file = one agent. Status and Depends-on live ONLY in STATUS.md (FCT-G). -->
+
+**Category:** review
+**Kind:** batch (3 units)   **Tier:** medium (SE-N)
+**Satisfies:** all D3 requirements
+**Skills:** none — reviewers load their own
+**Sabotage:** none — read-only review
+**Status, dependencies, drop:** see `STATUS.md` → TASK-024
+
+## Sources — the task's knowledge, nothing else
+- `docs/SRS.md` § all D3 requirements
+- `docs/INTERFACE_AGREEMENT.md` § all
+- `git diff drop/D2...HEAD`
+- `docs/SRS.md`
+- `SPEC.md` § Security Requirements
+
+## Units
+| # | Unit | Contract source | Test |
+|---|---|---|---|
+| 1 | Zero-context `/astra-code-review` over the diff since drop/D2 (SCR-G) | — | `qa/CODE_REVIEW.md` |
+| 2 | `/astra-security-audit` (SSR-A) | — | `qa/SECURITY_AUDIT.md` |
+| 3 | `/astra-doc-verify` | — | `qa/DOC_VERIFY.md` |
+
+## Files — owned exclusively by this task
+- `qa/CODE_REVIEW.md` (edit)
+- `qa/SECURITY_AUDIT.md` (edit)
+- `qa/DOC_VERIFY.md` (edit)
+
+## Progress — tick each box the moment it is true (FCT-M); `task.py done` refuses an open box
+- [ ] Unit 1 — Zero-context `/astra-code-review` over the diff since drop/D2: test first · green · committed
+- [ ] Unit 2 — `/astra-security-audit`: test first · green · committed
+- [ ] Unit 3 — `/astra-doc-verify`: test first · green · committed
+- [ ] SE-side QA checklist ticked
+- [ ] /astra-code-review --task PASS on a committed head
+
+### Review log
+<!-- Round N — <date> — <head sha> — PASS|BLOCK — S1 n · S2 n — fixed: … · open: … -->
+
+## Execution flow — every unit, in order
+Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 0–9 exactly: load skills → `task.py start TASK-024` → read `.astra/pack/TASK-024.md` → TDD → build → green + commit per unit → /verify → SE-side QA → sabotage (if required) → merge base + full suite → `/astra-code-review --task TASK-024` → `task.py done TASK-024` → commit.
+
+## SE-side QA checklist
+- [ ] Every unit has a test and it passes
+- [ ] Field contract exact for every unit — nothing missing, nothing added (FCT-H)
+- [ ] Every documented status code + error shape returned as documented
+- [ ] Negative path + auth tier covered per unit
+- [ ] `/verify` evidence written
+- [ ] No file outside `## Files` touched; no TODO / placeholder left
+
+## Acceptance
+- No open S1/S2
+- All gates PASS
+- Local deploy check PASS on the reviewed head
+
+## Out of scope
+- Fixing code

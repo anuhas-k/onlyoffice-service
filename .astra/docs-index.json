@@ -1,0 +1,37 @@
+{
+  "docs": [
+    {
+      "path": "docs/INTERFACE_AGREEMENT.md",
+      "kind": "interface-agreement",
+      "cite_in": [
+        "foundation",
+        "data",
+        "backend",
+        "frontend",
+        "mobile",
+        "contract",
+        "infra",
+        "integration"
+      ]
+    },
+    {
+      "path": "docs/SRS.md",
+      "kind": "srs",
+      "cite_in": [
+        "foundation",
+        "data",
+        "backend",
+        "frontend",
+        "mobile",
+        "contract",
+        "infra",
+        "integration"
+      ]
+    },
+    {
+      "path": "docs/source/Collaborative Editing Dual-Engine Design (Microsoft 365 for the web + ONLYOFFICE self-hosted).pdf",
+      "kind": "raw-source",
+      "cite_in": []
+    }
+  ]
+}

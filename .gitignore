@@ -1,0 +1,18 @@
+
+# ASTRA — private paths (auto-added by /init)
+.astra/checkpoints/
+.astra/*.log
+.astra/backups/
+.astra/change-scope.json
+.astra/board-live.json
+.astra/queue.json
+.astra/ship.json
+.astra/ship-pr-body.md
+.astra/intel-*.json
+.astra/.intel-throttle
+.env
+.env.test
+.env.local
+qa/.env.qa
+node_modules/
+.DS_Store

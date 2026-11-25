@@ -1,0 +1,112 @@
+{
+  "checkpoints": [
+    {
+      "id": "1795597805",
+      "timestamp": "2026-11-25T09:10:05Z",
+      "tool": "Write",
+      "file": "docs/SRS.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795597805",
+      "label": "auto"
+    },
+    {
+      "id": "1795597812",
+      "timestamp": "2026-11-25T09:10:12Z",
+      "tool": "Edit",
+      "file": "STATUS.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795597812",
+      "label": "auto"
+    },
+    {
+      "id": "1795598087",
+      "timestamp": "2026-11-25T09:14:47Z",
+      "tool": "Write",
+      "file": "/tmp/claude-1000/-home-anuhas-projects-word-editor-zkp/a77dc216-d606-4f8b-b848-1119d7912b8e/scratchpad/gen_tasks.py",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598087",
+      "label": "auto"
+    },
+    {
+      "id": "1795598112",
+      "timestamp": "2026-11-25T09:15:12Z",
+      "tool": "Edit",
+      "file": "/tmp/claude-1000/-home-anuhas-projects-word-editor-zkp/a77dc216-d606-4f8b-b848-1119d7912b8e/scratchpad/gen_tasks.py",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598112",
+      "label": "auto"
+    },
+    {
+      "id": "1795598121",
+      "timestamp": "2026-11-25T09:15:20Z",
+      "tool": "Edit",
+      "file": "/tmp/claude-1000/-home-anuhas-projects-word-editor-zkp/a77dc216-d606-4f8b-b848-1119d7912b8e/scratchpad/gen_tasks.py",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598121",
+      "label": "auto"
+    },
+    {
+      "id": "1795598124",
+      "timestamp": "2026-11-25T09:15:24Z",
+      "tool": "Edit",
+      "file": "/tmp/claude-1000/-home-anuhas-projects-word-editor-zkp/a77dc216-d606-4f8b-b848-1119d7912b8e/scratchpad/gen_tasks.py",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598124",
+      "label": "auto"
+    },
+    {
+      "id": "1795598205",
+      "timestamp": "2026-11-25T09:16:45Z",
+      "tool": "Edit",
+      "file": "docs/tasks/foundation/TASK-001-app-skeleton.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598205",
+      "label": "auto"
+    },
+    {
+      "id": "1795598206",
+      "timestamp": "2026-11-25T09:16:46Z",
+      "tool": "Write",
+      "file": "/tmp/claude-1000/-home-anuhas-projects-word-editor-zkp/a77dc216-d606-4f8b-b848-1119d7912b8e/scratchpad/gen_rtm.py",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598206",
+      "label": "auto"
+    },
+    {
+      "id": "1795598212",
+      "timestamp": "2026-11-25T09:16:52Z",
+      "tool": "Edit",
+      "file": "STATUS.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598212",
+      "label": "auto"
+    },
+    {
+      "id": "1795598466",
+      "timestamp": "2026-11-25T09:21:06Z",
+      "tool": "Edit",
+      "file": "AGENTS.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598466",
+      "label": "auto"
+    },
+    {
+      "id": "1795598467",
+      "timestamp": "2026-11-25T09:21:07Z",
+      "tool": "Write",
+      "file": "docs/INTERFACE_AGREEMENT.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598467",
+      "label": "auto"
+    },
+    {
+      "id": "1795598486",
+      "timestamp": "2026-11-25T09:21:26Z",
+      "tool": "Edit",
+      "file": "STATUS.md",
+      "git_sha": "",
+      "snap_dir": "/home/anuhas/projects/word-editor-zkp/.astra/checkpoints/1795598486",
+      "label": "auto"
+    }
+  ]
+}
