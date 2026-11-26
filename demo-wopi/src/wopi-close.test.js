@@ -120,6 +120,16 @@ test('leave with wait when the Document Server is down answers 200 with the unre
   assert.equal(res.json().forcesave, 'unreachable');
 });
 
+test('the default grace period is 1 second: nothing is sent at once, the close starts right after', async () => {
+  const h = await harness({ leaveGraceMs: undefined }); // undefined → the built-in default
+  const { f, alice } = await editedByAlice(h);
+  await h.leave(f.id, alice);
+  await wait(500);
+  assert.deepEqual(h.ds.commands, [], 'still inside the grace period at 0.5 s');
+  await wait(900);
+  assert.deepEqual(h.ds.commands.map((c) => c.c).slice(0, 2), ['forcesave', 'drop'], 'closed shortly after 1 s');
+});
+
 test('leave when the Document Server never sends UNLOCK: the last save is still promoted to a milestone', async () => {
   const h = await harness({ closeWaitMs: 40 });
   const { f, alice } = await editedByAlice(h);

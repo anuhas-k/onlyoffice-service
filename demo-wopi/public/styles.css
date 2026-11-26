@@ -37,3 +37,12 @@ button { background: none; border: 1px solid var(--line); border-radius: 6px; pa
 .diff-del .diff-mark { background: var(--del-mark); }
 .diff-skip { color: var(--muted); text-align: center; padding: 2px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
 #versions button { margin-left: 8px; padding: 1px 8px; font-size: 12px; }
+
+/* supported-types card */
+.formats td, .formats th { padding: 3px 8px; font-size: 13px; }
+.formats .kind-row th { background: var(--bg); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; color: var(--muted); }
+.formats code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mode-edit { color: #1a7f37; font-weight: 600; }
+.mode-view { color: var(--muted); }
+.warn { color: #b54708; }
+.formats button { padding: 1px 8px; font-size: 12px; }

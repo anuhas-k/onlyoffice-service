@@ -48,7 +48,7 @@ In the ONLYOFFICE-protocol demo the Document Server calls back ~10 s after the l
 | Signal | Source | What the backend does |
 |---|---|---|
 | Editor's own **Close** button | WOPI postMessage `UI_Close` (CheckFileInfo `PostMessageOrigin` + `ClosePostMessage`; page checks `event.origin` and `event.source`) | `POST /wopi-sessions/:id/leave` with `wait:true` → force-save + drop while the tab is still connected, then the page navigates away |
-| Tab / window closed, reload | `pagehide` → `sendBeacon` to `…/leave` | after a 3 s grace period (a reload re-registers) → force-save + drop |
+| Tab / window closed, reload | `pagehide` → `sendBeacon` to `…/leave` | after a 1 s grace period (a reload re-registers) → force-save + drop |
 | While editing | heartbeat every 30 s | throttled force-save → `checkpoint` (see parity table) |
 | Crashed tab, lost network | no heartbeat for 90 s (page beats every 30 s) | sweeper (every 15 s) → force-save + drop |
 | Nothing works / stuck file | you | `POST /files/:id/wopi/end` (demo user header) |
@@ -62,9 +62,11 @@ Force-save + drop make the Document Server send the last PutFile and UNLOCK; UNL
 - Proof keys: `X-WOPI-Proof` / `X-WOPI-ProofOld` / `X-WOPI-Timestamp`, RSA-SHA256 over length-prefixed token + UPPERCASE URL + timestamp, 20-minute window, current/old key rotation, 500 on failure. `WOPI_PROOF=off|log|enforce` (default **log**: mismatches are logged, calls still succeed). The byte order of the length prefixes is not stated in prose by the spec; big-endian is implemented. Run once with `log` and check `./trace.sh` for `wopi proof mismatch` before using `enforce`.
 - ONLYOFFICE WOPI pages: CheckFileInfo property list, PutFile headers, command service (`forcesave`, `drop`). Documented there but unused here: `X-LOOL-WOPI-IsAutosave` / `IsExitSave` / `IsModifiedByUser`. **Not documented there:** `DisableExport` (still sent, effect unverified).
 
+**All 57 Document Server formats (`src/formats.js`).** The registry lists every extension the Document Server publishes in `/hosting/discovery` (Word 23, spreadsheets 15, slides 15, PDF-like 4) with its mode, editor family and a first-bytes signature rule used for uploads. **Edit (15):** docx docm dotx odt txt · xlsx xlsm xltx ods csv · pptx pptm potx odp · pdf. **View only (42):** the rest, including legacy binaries (doc xls ppt …: the Document Server only offers *convert* to edit them, and convert needs PutRelativeFile, which answers 501), e-books, web pages, flat ODF, DjVu, XPS. Deviation from `SPEC.md` line 79: `.pptx` is editable here (the spec says view-only) because this spike exists to test every format. The page's **Supported file types** card shows each type, its mode, what the Document Server offers for it right now, and a **Create sample** button (`POST /samples/:ext`) for the 34 types that can be generated: 16 are hand-built (docx xlsx odp pdf txt csv rtf html htm mht mhtml xml fb2 fodt fods fodp) and 18 are converted by the Document Server's conversion service from those (docm dotx dotm odt ott epub · xlsm xltx xltm ods ots · pptx pptm potx potm ppsx ppsm otp). The other 23 (legacy binaries, DjVu, XPS, WPS, StarOffice, form formats, …) cannot be generated: upload your own. `GET /formats` returns the same table as JSON.
+
 **View changes (`.docx`):** every history entry has a *View changes* button that opens a git-style diff against the version before it (`GET /files/:id/versions/:versionId/diff`, optional `?against=<earlier version id>`). Paragraph-level lines with word-level marks inside edited paragraphs; unchanged runs are folded. It reads the stored snapshots only (the app keeps a full copy of the file at every save), so it works the same for the ONLYOFFICE and WOPI paths and would for a later Microsoft integration. **Text only:** formatting, images and table layout are not compared; other file types answer 415; an unreadable file 422; two huge unrelated versions 422 (`DiffTooLarge`). Implementation: `docx-text.js` (zip + XML with `node:zlib`, 20 MB zip-bomb cap), `text-diff.js` (LCS), `version-diff.js`, `public/diff-view.js`.
 
-The History panel groups checkpoints under the milestone that closed them (ADR-001) and refreshes with the 3-second file-list poll; checkpoints newer than the latest milestone show as "in progress".
+The History panel groups checkpoints under the milestone that closed them (ADR-001) and refreshes every second while it is open (every 3 s otherwise); checkpoints newer than the latest milestone show as "in progress".
 
 ### Parity with the ONLYOFFICE-protocol demo
 
@@ -82,7 +84,7 @@ The History panel groups checkpoints under the milestone that closed them (ADR-0
 | Bytes must match the file type | on download | on PutFile | `wopi.test.js` |
 | Tokens never logged | redacted | query string stripped from logged URLs | `wopi.test.js`, `wopi-close.test.js` |
 
-Automated: `npm test` (138 tests). The WOPI tests play the Document Server (same calls as the spike) and a fake `/command` endpoint; they do **not** prove the real Document Server behaves the same.
+Automated: `npm test` (178 tests). The WOPI tests play the Document Server (same calls as the spike) and a fake `/command` endpoint; they do **not** prove the real Document Server behaves the same.
 
 ### Live checks (need Docker)
 
@@ -90,9 +92,11 @@ Automated: `npm test` (138 tests). The WOPI tests play the Document Server (same
 
 1. Open **Open** (ONLYOFFICE) as Alice: it must still load (confirms `WOPI_ENABLED=true` did not break it). Close it.
 2. **Open (WOPI)** as Alice and Bob in two windows; type in both; each sees the other's cursor.
-3. In Bob's window click the editor's own **Close** (File → Close). Alice stays: `trace.sh` must show **no** force-save/drop (Alice is still there). Then close Alice's with the editor's Close button: within ~10 s the page returns to the list and History shows a `milestone`. Repeat closing a tab with the browser's X instead: the milestone appears after ~3 s + up to 8 s.
+3. In Bob's window click the editor's own **Close** (File → Close). Alice stays: `trace.sh` must show **no** force-save/drop (Alice is still there). Then close Alice's with the editor's Close button: within ~10 s the page returns to the list and History shows a `milestone`. Repeat closing a tab with the browser's X instead: the milestone appears after ~1 s grace + ~2 s Document Server + up to 1 s poll.
 4. Download/Print in the WOPI editor: hidden or refused?
 5. A `.pptx` over WOPI: view-only.
 6. Check `trace.sh` for `wopi proof mismatch`. None means proof construction matches the real server.
+
+Version history is recorded for every editable type (the backend stores a full copy at each save and never looks inside); the *View changes* diff only exists for `.docx`.
 
 Known gaps vs the ONLYOFFICE demo: closing relies on this page (a WOPI editor opened some other way is only closed by the 90 s sweeper); the access token does not renew past 1 h; `PUT_RELATIVE`/`RENAME_FILE` answer 501; the file stays refused to the other engine until the Document Server's own UNLOCK lands (~2 min after a close).

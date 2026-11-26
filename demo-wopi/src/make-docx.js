@@ -1,4 +1,4 @@
-// Test fixture builder: a minimal but valid .docx (zip) from a list of paragraphs. Used only by the tests.
+// Minimal but valid .docx (zip) from a list of paragraphs, plus the zip writer the sample builders reuse (sample-sources.js).
 import zlib from 'node:zlib';
 
 const CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
@@ -15,7 +15,8 @@ export function makeDocx(paragraphs, { compress = false, bodyXml, entries } = {}
   return zip(parts, compress);
 }
 
-function zip(parts, compress) {
+/** @param {Record<string, Buffer|string>} parts entries in order  @param {boolean} compress deflate each entry (false = stored) */
+export function zip(parts, compress) {
   const locals = [];
   const central = [];
   let offset = 0;

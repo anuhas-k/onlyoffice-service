@@ -7,7 +7,9 @@ import fastifyStatic from '@fastify/static';
 import { SignJWT, jwtVerify } from 'jose';
 import { openStore } from './store.js';
 import { documentKey, signDownloadToken, verifyDownloadToken } from './tokens.js';
-import { FORMATS, HttpError, MAX_UPLOAD_BYTES, hasMagic } from './common.js';
+import { HttpError, MAX_UPLOAD_BYTES } from './common.js';
+import { FORMAT_LIST, formatOf, hasSignature, extensionOf } from './formats.js';
+import { createSamples } from './samples.js';
 import { createWopi } from './wopi.js';
 import { diffVersions } from './version-diff.js';
 
@@ -37,6 +39,7 @@ export async function buildApp(opts) {
   const keys = new Map(); // key → fileId (every key ever issued, so retried callbacks still resolve)
   const app = Fastify({ logger: opts.logger ?? loggerOptions(), bodyLimit: 1024 * 1024 });
   const headers = securityHeaders(opts.dsPublicUrl);
+  const samples = createSamples({ opts });
   const wopi = createWopi({ store, opts, isOnlyofficeActive: (fileId) => sessions.has(fileId) });
 
   app.addHook('onSend', async (req, reply) => { reply.headers(headers); });
@@ -47,6 +50,11 @@ export async function buildApp(opts) {
     if (err instanceof HttpError) return reply.code(err.statusCode).send({ error: { code: err.code, message: err.message } });
     if (err.code === 'FST_REQ_FILE_TOO_LARGE') return reply.code(413).send({ error: { code: 'FileTooLarge', message: 'Upload exceeds 100 MB' } });
     if (err.validation) return reply.code(400).send({ error: { code: 'ValidationError', message: err.message } });
+    // Fastify's own request errors (bad JSON, unsupported content type, body too large) carry a 4xx statusCode: pass it on.
+    if (Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 500) {
+      const code = { 415: 'UnsupportedMediaType', 413: 'PayloadTooLarge' }[err.statusCode] ?? 'BadRequest';
+      return reply.code(err.statusCode).send({ error: { code, message: err.statusCode === 400 ? 'Malformed request' : err.message } });
+    }
     req.log.error({ err }, 'unhandled error');
     return reply.code(500).send({ error: { code: 'InternalError', message: 'Internal server error' } });
   });
@@ -63,6 +71,7 @@ export async function buildApp(opts) {
   };
 
   await wopi.register(app);
+  samples.register(app);
 
   app.get('/healthz', async () => ({ ok: true }));
 
@@ -71,11 +80,30 @@ export async function buildApp(opts) {
     const part = await req.file();
     if (!part) throw new HttpError(400, 'ValidationError', 'Missing file field');
     const bytes = await part.toBuffer();
-    const ext = path.extname(part.filename).slice(1).toLowerCase();
-    if (!hasMagic(ext, bytes)) {
-      throw new HttpError(400, 'UnsupportedFormat', 'Only .docx, .xlsx, .pptx and .pdf are supported');
+    const ext = extensionOf(part.filename);
+    if (!hasSignature(ext, bytes)) {
+      throw new HttpError(400, 'UnsupportedFormat', 'Unsupported file type, or the content does not match the extension (GET /formats lists what is accepted)');
     }
     const file = await store.createFile({ name: path.basename(part.filename), ext, bytes, createdBy: user });
+    return reply.code(201).send({ file: summary(file) });
+  });
+
+  // Every format the demo knows, how it is treated, whether a sample can be generated, and what the Document Server
+  // offers for it right now (WOPI discovery). No secrets here, so no user is required.
+  app.get('/formats', async () => {
+    const actions = await wopi.actionNames();
+    return {
+      dsReachable: actions !== null,
+      formats: FORMAT_LIST.map(({ ext, kind, mode, label }) => ({ ext, kind, mode, label, sample: samples.kindOf(ext), dsActions: actions ? (actions.get(ext) ?? []) : null })),
+    };
+  });
+
+  app.post('/samples/:ext', async (req, reply) => {
+    const user = userOf(req);
+    const { ext } = req.params;
+    if (!formatOf(ext)) throw new HttpError(404, 'UnknownFormat', 'No such format');
+    const bytes = await samples.build(ext);
+    const file = await store.createFile({ name: `sample.${ext}`, ext, bytes, createdBy: user });
     return reply.code(201).send({ file: summary(file) });
   });
 
@@ -158,11 +186,11 @@ export async function buildApp(opts) {
   }
 
   function editorConfig(file, session, user) {
-    const format = FORMATS[file.ext];
-    const mode = format.editable ? 'edit' : 'view';
+    const format = formatOf(file.ext);
+    const mode = format.mode;
     const t = signDownloadToken(opts.appSecret, { fileId: file.id, versionId: session.versionId });
     return {
-      documentType: format.documentType,
+      documentType: format.kind,
       document: {
         fileType: file.ext,
         key: session.key,

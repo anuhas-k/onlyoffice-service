@@ -2,7 +2,8 @@
 // SPIKE — never merged. Operations follow the verification spike in docs/decisions/002-documentserver-verification.md
 // and the Microsoft WOPI REST / proof-key / postMessage docs plus the ONLYOFFICE WOPI pages.
 import { signAccessToken, verifyAccessToken } from './wopi-tokens.js';
-import { FORMATS, HttpError, MAX_UPLOAD_BYTES, hasMagic } from './common.js';
+import { HttpError, MAX_UPLOAD_BYTES } from './common.js';
+import { formatOf, hasSignature } from './formats.js';
 import { createDsCommand, DsCommandError } from './ds-command.js';
 import { parseProofKeys, verifyProof } from './wopi-proof.js';
 
@@ -14,19 +15,19 @@ const POLL_MS = 20;
 const NOT_SUPPORTED = new Set(['PUT_RELATIVE', 'RENAME_FILE', 'DELETE_FILE', 'PUT_USER_INFO', 'GET_RESTRICTED_LINK', 'REVOKE_RESTRICTED_LINK']);
 const USER_ID = /^[A-Za-z0-9]+$/;
 // Tunables (tests shrink them). appPublicUrl has no default on purpose: config.js always supplies it.
-const DEFAULTS = { leaveGraceMs: 3000, closeWaitMs: 8000, presenceTtlMs: 90_000, sweepMs: 15_000, wopiProof: 'log', autoCheckpointMs: 30_000 };
+const DEFAULTS = { leaveGraceMs: 1000, closeWaitMs: 8000, presenceTtlMs: 90_000, sweepMs: 15_000, wopiProof: 'log', autoCheckpointMs: 30_000 };
 
 const decodeEntities = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const displayName = (user) => user[0].toUpperCase() + user.slice(1);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Parse WOPI discovery XML into Map("ext:action" → urlsrc). Handles raw '>' inside quoted attribute values. */
+/** Parse WOPI discovery XML into Map("ext:action" → urlsrc[]). A few extensions (xml) are listed under more than one editor. Handles raw '>' inside quoted attribute values. */
 export function parseDiscovery(xml) {
   const actions = new Map();
   for (const tag of xml.matchAll(/<action\s+((?:[^>"]|"[^"]*")*?)\/?>/g)) {
     const attrs = Object.fromEntries([...tag[1].matchAll(/([\w:-]+)="([^"]*)"/g)].map((m) => [m[1], decodeEntities(m[2])]));
     const key = `${attrs.ext}:${attrs.name}`;
-    if (attrs.ext && attrs.name && attrs.urlsrc && !actions.has(key)) actions.set(key, attrs.urlsrc);
+    if (attrs.ext && attrs.name && attrs.urlsrc) actions.set(key, [...(actions.get(key) ?? []), attrs.urlsrc]);
   }
   return actions;
 }
@@ -79,8 +80,8 @@ export function createWopi({ store, opts: given, isOnlyofficeActive }) {
 
   // ── discovery ──────────────────────────────────────────────────────────────
 
-  async function discoveryData() {
-    if (discovery && Date.now() - discovery.at < DISCOVERY_TTL_MS) return discovery;
+  async function discoveryData({ fresh = false } = {}) {
+    if (!fresh && discovery && Date.now() - discovery.at < DISCOVERY_TTL_MS) return discovery;
     try {
       const res = await fetchImpl(new URL('/hosting/discovery', opts.dsInternalUrl), { redirect: 'error', signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -92,12 +93,35 @@ export function createWopi({ store, opts: given, isOnlyofficeActive }) {
     }
   }
 
+  /** Map(ext → action names) as the Document Server publishes them right now, or null when it cannot be reached. */
+  async function actionNames() {
+    let actions;
+    try {
+      ({ actions } = await discoveryData({ fresh: true }));
+    } catch (err) {
+      if (err instanceof HttpError) return null;
+      throw err;
+    }
+    const byExt = new Map();
+    for (const key of actions.keys()) {
+      const split = key.indexOf(':');
+      const ext = key.slice(0, split);
+      byExt.set(ext, [...(byExt.get(ext) ?? []), key.slice(split + 1)]);
+    }
+    return byExt;
+  }
+
   async function openSession(file, user) {
     if (isOnlyofficeActive(file.id)) throw new HttpError(409, 'EngineBusy', 'This file is open in an ONLYOFFICE-protocol session');
     const { actions } = await discoveryData();
-    const wantsEdit = FORMATS[file.ext].editable;
-    const editSrc = wantsEdit ? actions.get(`${file.ext}:edit`) : undefined;
-    const urlsrc = editSrc ?? actions.get(`${file.ext}:view`);
+    const { kind, mode } = formatOf(file.ext);
+    // prefer the editor family the registry names; fall back to whatever the Document Server lists first
+    const pick = (action) => {
+      const candidates = actions.get(`${file.ext}:${action}`) ?? [];
+      return candidates.find((src) => src.includes(`/hosting/wopi/${kind}/`)) ?? candidates[0];
+    };
+    const editSrc = mode === 'edit' ? pick('edit') : undefined;
+    const urlsrc = editSrc ?? pick('view');
     if (!urlsrc) throw new HttpError(400, 'UnsupportedForWopi', `The Document Server offers no WOPI action for .${file.ext}`);
     const canWrite = Boolean(editSrc);
     const parsed = new URL(urlsrc.replace(/<[^>]*>/g, ''));
@@ -225,7 +249,7 @@ export function createWopi({ store, opts: given, isOnlyofficeActive }) {
     if (!lock) return conflict(reply, '', 'file is not locked');
     if (req.headers['x-wopi-lock'] !== lock.id) return conflict(reply, lock.id, 'lock mismatch');
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    if (!hasMagic(file.ext, bytes)) throw new HttpError(400, 'UnsupportedFormat', `Saved bytes are not a valid .${file.ext}`);
+    if (!hasSignature(file.ext, bytes)) throw new HttpError(400, 'UnsupportedFormat', `Saved bytes are not a valid .${file.ext}`);
     touchPresence(state, claims.user);
     const { version, created } = await store.addVersion(file.id, bytes, { kind: 'checkpoint', participants: contributors(req, state), documentKey: `wopi:${lock.id}` });
     if (created) lock.saved = true;
@@ -389,5 +413,5 @@ export function createWopi({ store, opts: given, isOnlyofficeActive }) {
     }
   }
 
-  return { register, openSession, editors, isActive, endSession };
+  return { register, openSession, editors, isActive, endSession, actionNames };
 }

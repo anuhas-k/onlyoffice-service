@@ -2,8 +2,10 @@
 // File list page: pick a user, upload, see who is editing, open the editor, view history.
 import { groupVersions } from './history-groups.js';
 import { renderDiff, showDiffError, hideDiff } from './diff-view.js';
+import { renderFormats, acceptList } from './formats-view.js';
 
 const POLL_MS = 3000;
+const HISTORY_POLL_MS = 1000; // faster while a history panel is open, so a new version shows up soon after the save
 const userSelect = document.getElementById('user');
 const savedUser = (() => { try { return sessionStorage.getItem('demo-user'); } catch { return null; } })();
 if (savedUser) userSelect.value = savedUser;
@@ -26,6 +28,8 @@ function cell(text, className) {
   return td;
 }
 
+let modeByExt = new Map(); // ext → 'edit' | 'view', from GET /formats
+
 function renderFiles(files) {
   const tbody = document.getElementById('files');
   tbody.replaceChildren();
@@ -39,7 +43,7 @@ function renderFiles(files) {
   }
   for (const f of files) {
     const tr = document.createElement('tr');
-    tr.append(cell(f.name), cell(f.editors.length ? f.editors.join(', ') : '—'), cell(String(f.versionCount)));
+    tr.append(cell(`${f.name}${modeByExt.get(f.ext) === 'view' ? '  (view only)' : ''}`), cell(f.editors.length ? f.editors.join(', ') : '—'), cell(String(f.versionCount)));
     const actions = document.createElement('td');
     const open = document.createElement('a');
     open.href = `/editor.html?id=${encodeURIComponent(f.id)}&user=${encodeURIComponent(userSelect.value)}`;
@@ -160,7 +164,34 @@ document.getElementById('upload').addEventListener('submit', async (e) => {
   }
 });
 
-refresh();
-setInterval(refresh, POLL_MS);
+// self-scheduling poll: the delay depends on whether a history panel is open
+async function pollLoop() {
+  await refresh();
+  setTimeout(pollLoop, historyFile ? HISTORY_POLL_MS : POLL_MS);
+}
+pollLoop();
 
 document.getElementById('diff-close').addEventListener('click', hideDiff);
+
+// "Supported file types" card + the upload picker's accept list
+async function loadFormats() {
+  const status = document.getElementById('formats-summary');
+  try {
+    const data = await api('/formats');
+    modeByExt = new Map(data.formats.map((f) => [f.ext, f.mode]));
+    document.getElementById('file').accept = acceptList(data);
+    renderFormats(data, async (format) => {
+      status.textContent = `Creating a .${format.ext} sample…`;
+      try {
+        await api(`/samples/${encodeURIComponent(format.ext)}`, { method: 'POST' });
+        status.textContent = `Created sample.${format.ext} — it is in the Files list below.`;
+        refresh();
+      } catch (err) {
+        status.textContent = `Could not create the .${format.ext} sample: ${err.message}`;
+      }
+    });
+  } catch (err) {
+    status.textContent = `Could not load the supported types: ${err.message}`;
+  }
+}
+loadFormats();
