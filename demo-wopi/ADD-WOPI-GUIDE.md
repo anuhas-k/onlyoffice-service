@@ -1,6 +1,6 @@
 # Add WOPI to your app (ONLYOFFICE Document Server)
 
-**Version:** 1.0 · **Date:** 2026-11-26 · **Based on:** the `demo-wopi/` demo, ONLYOFFICE Document Server **8.2.2** · **Status:** written from the demo's working code; read "What was not verified" before relying on it
+**Version:** 1.1 · **Date:** 2026-11-26 · **Based on:** the `demo-wopi/` demo, ONLYOFFICE Document Server **8.2.2** · **Status:** written from the demo's working code; read "What was not verified" before relying on it
 
 This guide is for a developer who has an app that stores files and wants the ONLYOFFICE editor to open and save them over **WOPI**. It lists the smallest set of things to build, in the order to build them, and the traps found while building the demo. `API-v0.2.1.md` describes the demo's own endpoints; the working reference code is in `src/wopi.js`, `src/wopi-tokens.js`, `src/ds-command.js` and `public/editor.js`.
 
@@ -225,7 +225,66 @@ The four WOPI operations above are the same operations Microsoft's hosts call, s
 
 ---
 
-## 10. What was not verified
+## 10. Connecting your own storage (for example Bethel)
+
+The Document Server never writes to your storage. It calls your WOPI host, and the host reads and writes. So saving is entirely your code: GetFile reads a version, PutFile writes one. Keep all storage access behind one small interface so the demo's disk store can be swapped for yours.
+
+### What the demo's store does (`src/store.js`)
+
+| WOPI call | Host handler | Store call |
+|---|---|---|
+| GetFile | `getFile` in `src/wopi.js` | `readVersion(fileId, versionId)` for the newest version |
+| PutFile | `putFile` | `addVersion(fileId, bytes, {kind: 'checkpoint', participants, documentKey})` |
+| UNLOCK at the end of a session | `unlock` | `promote(fileId, versionId, 'milestone')` |
+| CheckFileInfo | `checkFileInfo` | `get(fileId)` for name, size and version id |
+
+The demo's store keeps JSON metadata and one immutable blob file per version. It has no encryption (its header says so), so treat it as the shape to copy, not the code to ship.
+
+### The interface to implement
+
+Your storage adapter needs these four operations. Names are the demo's; the signatures are what the handlers call.
+
+```js
+get(fileId)                                   // metadata: id, name, ext, versions[] (id, kind, sha256, size, createdAt)
+readVersion(fileId, versionId)                // -> Buffer, the whole file
+addVersion(fileId, bytes, {kind, participants, documentKey})
+                                              // -> {version, created}; created=false when nothing new was stored
+promote(fileId, versionId, kind)              // relabel a version, for example checkpoint -> milestone
+```
+
+### Rules the PutFile path must follow
+
+1. **Whole file in, whole file out.** The editor sends the complete file on every save, never a diff.
+2. **Write first, answer after.** Return 200 only after the version is durably stored. If storing fails, return 500 so the editor retries; never acknowledge a save you did not keep.
+3. **Be idempotent.** The demo hashes the bytes (SHA-256) and returns the existing version when the same bytes arrive again (same `documentKey` + hash, or same as the head). Your adapter must do the same, because retries and repeated saves of an unchanged file are normal.
+4. **Versions are immutable.** Add a new blob and move the head; never overwrite a stored version. History and restore depend on this.
+5. **Check the lock before writing**, and check the bytes look like the file type (`hasSignature`) so a bad upload cannot replace a good document.
+6. **Record who contributed.** `X-WOPI-Editors` on PutFile lists the users behind the save; store it as `participants`.
+7. **Serialize writes per file.** Two saves racing on one file must not produce two heads.
+
+### Encryption and zero-knowledge storage
+
+The Document Server has to read the plaintext to edit it, so a storage layer that must never see plaintext has to be handled in the host:
+
+- **Host encrypts (storage stays blind):** GetFile decrypts the stored blob and returns plaintext to the Document Server. PutFile receives plaintext, encrypts it (for example AES-256-GCM with a per-file key wrapped by a master key), and hands only ciphertext to storage. Deleting the key then makes the file unrecoverable.
+- **Storage decrypts for the host:** simpler, but the storage service sees plaintext, so it is no longer zero-knowledge.
+
+Either way, the host and the Document Server hold the plaintext while a session is open, and the Document Server keeps temporary files for it. A strict zero-knowledge claim cannot cover the editing period; decide and state this before production. Also compute the SHA-256 used for dedup on the plaintext or a keyed hash, not on ciphertext with a random nonce (that would never match twice).
+
+### Checklist for a new storage adapter
+
+- [ ] `readVersion` returns exactly the bytes `addVersion` stored.
+- [ ] A repeated `addVersion` with identical bytes returns `created: false` and no new version.
+- [ ] A failed write returns an error and leaves the head unchanged.
+- [ ] Two concurrent `addVersion` calls on one file end with one consistent history.
+- [ ] `promote` changes only the label, not the bytes.
+- [ ] The demo's store tests (`src/store.test.js`) pass against your adapter, and the WOPI tests (`src/wopi.test.js`, `src/wopi-close.test.js`) pass with it wired into the app. Only `store.test.js` calls `openStore` directly; I did not try swapping the adapter into the WOPI tests, so expect to adjust their setup.
+
+**Not verified:** the demo has only run against its local-disk store. I have not seen Bethel's storage API, so streaming, size limits, its own versioning and key handling are open questions for that integration.
+
+---
+
+## 11. What was not verified
 
 - **Saving from a real editor** was proven for `.docx` over WOPI only. Other file types open and render in the editor, but I did not save from them.
 - **Proof keys:** the byte order of the length prefixes is unconfirmed, so enforcement is not recommended yet.
@@ -236,7 +295,7 @@ The four WOPI operations above are the same operations Microsoft's hosts call, s
 
 ---
 
-## 11. Reference
+## 12. Reference
 
 - Demo code: `src/wopi.js` (host and close logic), `src/wopi-tokens.js`, `src/wopi-proof.js`, `src/ds-command.js`, `public/editor.js`.
 - Demo behaviour, timings and error codes: `API-v0.2.1.md` (sections 4.13, 6, 12).
