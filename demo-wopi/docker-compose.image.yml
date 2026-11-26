@@ -1,0 +1,37 @@
+# Run the demo from a ready-built app image (no source code or build needed).
+#   cp .env.example .env   # then fill in the two secrets (see DOCKER.md)
+#   docker compose -f docker-compose.image.yml up -d
+# Everything that varies between machines is a setting in .env; the defaults match a single-machine setup on localhost.
+name: demo-wopi
+services:
+  app:
+    image: ${APP_IMAGE:-demo-wopi-app:1.0}
+    environment:
+      DS_JWT_SECRET: ${DS_JWT_SECRET:?copy .env.example to .env and set DS_JWT_SECRET}
+      APP_SECRET: ${APP_SECRET:?copy .env.example to .env and set APP_SECRET}
+      DS_PUBLIC_URL: ${DS_PUBLIC_URL:-http://localhost:8081}     # how the BROWSER reaches the Document Server
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:3001}   # how the BROWSER reaches this app
+      DS_INTERNAL_URL: http://documentserver                     # how the app reaches the Document Server (Docker network)
+      APP_INTERNAL_URL: http://app:3000                          # how the Document Server reaches the app (Docker network)
+      WOPI_PROOF: ${WOPI_PROOF:-log}
+    ports: ["${APP_PORT:-3001}:3000"]
+    volumes: ["demo-data:/data"]
+    depends_on: [documentserver]
+    restart: unless-stopped
+
+  documentserver:
+    image: onlyoffice/documentserver:8.2.2
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${DS_JWT_SECRET:?copy .env.example to .env and set DS_JWT_SECRET}
+      JWT_HEADER: Authorization
+      WOPI_ENABLED: "true"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"   # lets the Document Server download from app:3000 on the Docker network
+    ports: ["${DS_PORT:-8081}:80"]
+    volumes: ["ds-data:/var/www/onlyoffice/Data", "ds-cache:/var/lib/onlyoffice"]
+    restart: unless-stopped
+
+volumes:
+  demo-data:
+  ds-data:
+  ds-cache:

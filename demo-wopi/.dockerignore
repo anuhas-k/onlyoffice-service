@@ -1,5 +1,10 @@
 .git
-node_modules
+**/node_modules
 .env*
-*.test.js
+!.env.example
+**/*.test.js
 .DS_Store
+trace.sh
+DOCKER.md
+docker-compose.image.yml
+dist
