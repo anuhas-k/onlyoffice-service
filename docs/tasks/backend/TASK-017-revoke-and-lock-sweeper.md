@@ -1,4 +1,6 @@
-# TASK-017 — Revoke mid-session + lock sweeper
+# TASK-017 — Revoke mid-session, close detection, lock sweeper
+> **WOPI change (DEC-001 draft, `docs/decisions/003-wopi-primary-editing-path.md`):** reworked for WOPI. The Document Server sends no editor-left signal and no PutFile on Save, so this task adds close detection and forcesave-on-close. Behaviour measured on 8.2.2: drop → UNLOCK after about 2 minutes; forcesave → PutFile in seconds.
+
 <!-- One task = one file = one agent. Status and Depends-on live ONLY in STATUS.md (FCT-G). -->
 
 **Category:** backend
@@ -6,34 +8,36 @@
 **Satisfies:** FR-041, FR-042, FR-043, FR-044, FR-045
 **Skills:** clean-code, bug-prevention, backend-engineer, security-engineer
 **Sabotage:** required — revocation is an authorization rule
-**Design:** Revoke: set participants.revoked_at, send command `drop` for that user (≤ 10 s), and refuse that user any new session config for the file while the session lives. Rejoin with an old config: the config JWT is short-lived, and a status-1 callback that lists a revoked user triggers `drop` again (adds to the callback status-1 handler). Sweeper every 60 s: expired lease → command `info`; release only if DS reports the key gone; DS unreachable → keep the lock (fail closed).
+**Design:** Revoke: set participants.revoked_at, expire that user's access token for the file (every later WOPI call → 401) and send command `drop` for the user; revoke timing is **unmeasured** (the demo has no revoke path), so the 10 s target in AC-12 is a hypothesis to test in unit 1. Refuse that user a new session for the file while the session lives. Close detection (from `demo-wopi/src/wopi.js`): the page sends a heartbeat and a leave beacon; `UI_Close` calls leave with `wait`; the sweeper treats a missing heartbeat past the presence TTL as left. On last-user-left: `forcesave` (PutFile arrives in seconds), promote to milestone, then `drop` so the Document Server unlocks. Backstop sweeper every 60 s: expired lease → command `info`; release only if DS reports the document gone; DS unreachable → keep the lock (fail closed).
 **Status, dependencies, drop:** see `STATUS.md` → TASK-017
 
 ## Sources — the task's knowledge, nothing else
 - `docs/SRS.md` § FR-041, FR-042, FR-043, FR-044, FR-045
 - `docs/INTERFACE_AGREEMENT.md` § A (Access Map), D (Identifiers), F (Error Catalog)
-- `docs/decisions/001-onlyoffice-editing-service.md` § D4 (Abandonment); § D1 (revocation via drop)
+- `docs/decisions/003-wopi-primary-editing-path.md` (AC-4, AC-11, AC-12 rows); `docs/decisions/001-onlyoffice-editing-service.md` § D4 (Abandonment); § D1 (revocation via drop)
+- `demo-wopi/ADD-WOPI-GUIDE.md` § 7 (what WOPI does not give you; command service)
+- `demo-wopi/API-v0.2.1.md` § 12 (measured timings)
 - `SPEC.md` § API Contracts (`DELETE …/participants/:userId`)
 
 ## Units
 | # | Unit | Contract source | Test |
 |---|---|---|---|
 | 1 | `DELETE /files/:id/sessions/current/participants/:userId` + drop (FR-043, FR-045) | SPEC API Contracts | `tests/modules/sessions/revoke.test.ts` |
-| 2 | Rejoin refused: open refused + status-1 re-drop (FR-044) | SRS FR-044 | `tests/modules/sessions/rejoin.test.ts` |
-| 3 | Lock sweeper job (FR-041, FR-042) | ADR D4 | `tests/modules/sessions/sweeper.test.ts` |
+| 2 | Rejoin refused: open refused + token expired + re-drop on the next heartbeat (FR-044) | SRS FR-044 | `tests/modules/sessions/rejoin.test.ts` |
+| 3 | Close detection: heartbeat, leave, presence sweep, forcesave → milestone → drop; lock backstop sweeper (FR-041, FR-042) | ADR D4, ADR-003 AC-4 | `tests/modules/sessions/sweeper.test.ts` |
 
 ## Files — owned exclusively by this task
 - `src/modules/sessions/revoke.routes.ts` (create)
 - `src/modules/sessions/revoke.service.ts` (create)
 - `src/modules/sessions/sweeper.ts` (create)
-- `src/modules/callback/status-handlers.ts` (edit — status-1 re-drop of revoked users)
+- `src/modules/wopi/presence.ts` (create — heartbeat, leave, presence sweep)
 - `tests/modules/sessions/revoke.test.ts` (create)
 - `tests/modules/sessions/rejoin.test.ts` (create)
 - `tests/modules/sessions/sweeper.test.ts` (create)
 
 ## Progress — tick each box the moment it is true (FCT-M); `task.py done` refuses an open box
 - [ ] Unit 1 — `DELETE /files/:id/sessions/current/participants/:userId` + drop: test first · green · committed
-- [ ] Unit 2 — Rejoin refused: open refused + status-1 re-drop: test first · green · committed
+- [ ] Unit 2 — Rejoin refused: open refused + token expired + re-drop: test first · green · committed
 - [ ] Unit 3 — Lock sweeper job: test first · green · committed
 - [ ] SE-side QA checklist ticked
 - [ ] /astra-code-review --task PASS on a committed head
@@ -53,7 +57,9 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 - [ ] No file outside `## Files` touched; no TODO / placeholder left
 
 ## Acceptance
-- Revoked user dropped within 10 s; other editors unaffected
+- Revoked user's next WOPI call → 401 and the editor is dropped; the measured time is recorded (target 10 s, unverified); other editors unaffected
+- Last user closes → one milestone version; measured close-to-milestone time recorded (replaces the 10 s claim in AC-4 until measured)
+- Tab closed without Close → sweeper ends the session after the presence TTL
 - Expired lease with DS still holding → lock kept
 - DS unreachable → lock kept
 

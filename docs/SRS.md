@@ -1,9 +1,9 @@
 # Software Requirements Specification
 Project: word-editor-zkp — ONLYOFFICE editing service (prototype)
-Version: 0.1
+Version: 0.2 (draft)
 Author: BA (prepared in session with anuhas, SE)
-Date: 2026-11-25
-Status: Approved 2026-11-25 (anuhas, SE)
+Date: 2026-11-26
+Status: v0.1 approved 2026-11-25; v0.2 reworded for WOPI (DEC-001 draft) and awaiting re-sign
 Standards: ISO/IEC/IEEE 29148:2018 · ISO/IEC 25010:2023 · EARS · Gherkin · MoSCoW
 
 ---
@@ -33,18 +33,19 @@ mouse-pointer tracking; an audit-log UI; rate limiting (prototype has one truste
 |------|-----------|
 | Document Server (DS) | The self-hosted ONLYOFFICE engine that renders the editor in the browser and merges co-editors' changes. |
 | Editing service | The system specified here. Owns files, versions, sessions, locks and keys. |
-| Session | One live editing of one file in the DS, shared by all its co-editors, identified by one document key. |
-| Document key | The identifier the DS uses for a session. Unique per file version. |
+| Session | One live editing of one file in the DS, shared by all its co-editors, identified by one WOPI lock id. |
+| Lock id | The identifier the DS sends with every WOPI lock and save request for a session (`X-WOPI-Lock`). |
+| Access token | A signed credential bound to one file, one user and one mode, used on every WOPI call. |
 | Lock | The record that a file is being edited, by which holder type, until when (lease). |
 | Lease | The time a lock stays valid without renewal: 30 minutes. |
 | Holder type | Which engine holds a lock: ONLYOFFICE (now); desktop or M365 (later). |
-| Callback | The status message the DS sends the editing service about a session (ONLYOFFICE-defined). |
-| Milestone version | The version saved when all users have closed the file (DS status 2). |
-| Checkpoint version | A version saved by a force-save while the session stays live (DS status 6). |
+| WOPI | The HTTP protocol the DS uses to read and write a file on the host: CheckFileInfo, GetFile, PutFile and lock operations. |
+| Milestone version | The version saved when all users have closed the file (the save committed when the last editor leaves; DEC-001). |
+| Checkpoint version | A version saved by a force-save while the session stays live (a save while the session stays live). |
 | Recovered version | A version rebuilt from a DS "forgotten" file after the service missed a save. |
 | Conflict version | A save whose base version is no longer the head; stored beside the head, never merged. |
 | Forgotten file | A document the DS kept because it could not deliver the save (listed by its command service). |
-| Download token | A 5-minute signed credential bound to one file + one document key, used to fetch content. |
+| Download token | A 5-minute signed credential bound to one file + one version, used to fetch old-version content. |
 | Data key | The per-file AES-256-GCM key that encrypts that file's versions; itself encrypted by the master key. |
 | Crypto-shredding | Deleting a file by destroying its data key, so no version can be decrypted again. |
 | Leaf | The salted fingerprint of one milestone version: SHA-256(salt ‖ content hash ‖ version id). |
@@ -56,7 +57,8 @@ mouse-pointer tracking; an audit-log UI; rate limiting (prototype has one truste
 - `SPEC.md` — approved 2026-11-25 (AC-1…AC-16, scope, security, risks).
 - `docs/decisions/001-onlyoffice-editing-service.md` — ADR D1–D8.
 - `docs/source/Collaborative Editing Dual-Engine Design (Microsoft 365 for the web + ONLYOFFICE self-hosted).pdf`
-- ONLYOFFICE Docs API — callback handler, command service, server config, shard key (links in ADR-001 §Sources).
+- ONLYOFFICE Docs API — command service, server config; WOPI pages (links in ADR-001 §Sources, ADR-003, `demo-wopi/ADD-WOPI-GUIDE.md`).
+- `docs/decisions/003-wopi-primary-editing-path.md` and DEC-001 (draft): editing moves to WOPI; this SRS was reworded to match.
 
 ### 1.5 Overview
 §2 describes context, users and constraints. §3 holds the requirements: functional (3.1, EARS),
@@ -76,7 +78,7 @@ Bethel will own later (upload, list, delete, dev login). It sits between three p
           │                                 ▲   │
           └──────── editor websocket ───────┼─► Document Server (ONLYOFFICE)
                                             │   │
-                     callback + download ───┘◄──┘  command service (info/drop/forcesave/forgotten)
+                     WOPI calls ────────────┘◄──┘  command service (info/drop/forcesave)
 ```
 
 ### 2.2 Product functions
@@ -93,7 +95,7 @@ Bethel will own later (upload, list, delete, dev login). It sits between three p
 |-----------|-------------|--------------------------------|
 | Editor (end user) | Opens, edits and co-edits files of their tenant. | Novice; tenant-scoped token. |
 | Tester / operator | Runs the stack, uses the test UI, revokes users, inspects versions and roots. | Expert; same tenant-scoped token in the prototype. |
-| Document Server | Machine actor: fetches content, sends callbacks. | Shared JWT secret. |
+| Document Server | Machine actor: reads and writes the file over WOPI. | Per-user access token (JWT secret only for commands we send it). |
 | Bethel platform (later) | Supplies storage and identity through the storage seam and token verifier. | Not present in the prototype. |
 
 ### 2.4 Operating environment
@@ -105,7 +107,7 @@ Bethel will own later (upload, list, delete, dev login). It sits between three p
 | Constraint | Description | Impact (what it rules out) |
 |-----------|-------------|----------------------------|
 | Imposed tech | The DS is configured, never modified or rebuilt. | No patches to editor behaviour; only its documented config. |
-| Imposed protocol | The DS dictates the callback shape, status codes and retry behaviour. | The service must adapt to it (§3.2). |
+| Imposed protocol | The DS dictates the WOPI request shapes, lock semantics and its own timing (no save on the Save button, no editor-left signal, unlock about 2 minutes after a drop; measured on 8.2.2). | The service must add its own close detection and force-save (§3.2, FR-030). |
 | Licensing | Community Edition: ≤ 20 concurrent connections (verify on pinned version). | Load and co-edit tests stay ≤ 20 editors. |
 | Security trade-off (ADR D1) | Plaintext exists in the DS container and the service's memory/temp files while a file is open. | The zero-knowledge property does not hold during editing; must be stated, not hidden. |
 | Seam | All storage access goes through one storage gateway (ADR D1). | No other component may read or write version blobs directly. |
@@ -114,9 +116,9 @@ Bethel will own later (upload, list, delete, dev login). It sits between three p
 | ID | Assumption | If wrong — impact |
 |----|-----------|-------------------|
 | ASM-001 | The DS can be configured to download from private Docker-network addresses. | Opening fails end-to-end; first task must prove it (Risk R1). |
-| ASM-002 | A callback download URL stays valid ≥ the time to download a 10 MB file (default reportedly 900 s). | Saves fail; reliance shifts entirely to the forgotten-file recovery. |
-| ASM-003 | The DS lists unsaved documents through its forgotten-files commands (7.5+). | AC-8 recovery is impossible; must pin a version that supports it. |
-| ASM-004 | The DS retry count can be raised to 6 through its config. | Shorter retry window; more saves depend on recovery. |
+| ASM-002 | The DS delivers a 10 MB save to PutFile within the request timeout. | Saves fail; a larger timeout or a size cap is needed. |
+| ASM-003 | The DS keeps unsaved WOPI documents available through its forgotten-files commands (7.5+). **Untested under WOPI.** | AC-8 recovery is impossible; FR-038 stays on hold. |
+| ASM-004 | The DS retries a failed PutFile. **Untested.** | A failed save is lost unless the host retries or recovers it. |
 | ASM-005 | One trusted tester uses the prototype. | Rate limiting would be required before shared use. |
 
 | ID | Dependency | Type | Owner | Risk if unavailable |
@@ -286,47 +288,45 @@ Scenario: unknown file
 #### Group D — Opening and co-editing
 
 #### FR-013 — Open for editing
-**Requirement (EARS):** WHEN a user opens an unlocked editable file for editing, the system shall create a session with a 30-minute lease and return a signed editor configuration.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-2, D4
+**Requirement (EARS):** WHEN a user opens an unlocked editable file for editing, the system shall create a session with a 30-minute lease and return the editor launch details (the Document Server's editor address and a file-bound access token).
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-2, D4, DEC-001
 ```gherkin
 Scenario: first editor
   Given file F has no lock
   When alice opens F for editing
-  Then F is locked by an ONLYOFFICE session with a lease ending 30 minutes later
-  And alice receives a signed editor configuration for F
+  Then F is held by an ONLYOFFICE session with a lease ending 30 minutes later
+  And alice receives the editor address and an access token bound to F and alice
 ```
-
 #### FR-014 — No download during editing
-**Requirement (EARS):** The editor configuration shall not offer the file as a browser download.
+**Requirement (EARS):** The file information the system gives the editor shall not offer the file as a browser download.
 **Priority:** Must · **Verification:** Test + Demonstration · **Traces to:** AC-2
+**Note:** the effect of the export-disabling property is unverified on Document Server 8.2.2; confirm by demonstration before relying on it.
 ```gherkin
 Scenario: download disabled
   Given alice has F open in the editor
   Then the editor offers no download or "save as" to the local machine
-  And the issued configuration disables downloading
+  And the file information returned for alice's token disables export
 ```
-
 #### FR-015 — Join the existing session
-**Requirement (EARS):** WHEN a second user opens a file that already has an ONLYOFFICE session, the system shall add them to that session under the same document key.
+**Requirement (EARS):** WHEN a second user opens a file that already has an ONLYOFFICE session, the system shall add them to that session and renew its lease.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-3, D4
 ```gherkin
 Scenario: second editor joins
-  Given alice has F open for editing under key K
+  Given alice has F open for editing
   When bob opens F for editing
-  Then bob's configuration uses key K
+  Then bob receives his own access token for the same session
   And the lease on F is renewed
 ```
-
 #### FR-016 — Live co-editing with names
-**Requirement (EARS):** The editor configuration shall turn on fast co-editing and identify each user by display name.
+**Requirement (EARS):** The file information the system gives the editor shall identify each user by display name, and co-editors shall see each other's changes live.
 **Priority:** Must · **Verification:** Demonstration · **Traces to:** AC-3
+**Note:** live co-editing latency under WOPI was not measured in the demo.
 ```gherkin
 Scenario: see each other
   Given alice and bob have F open in two browser windows
   When alice types a sentence
   Then bob sees the text and alice's named cursor within 2 seconds
 ```
-
 #### FR-017 — View-only when another engine holds the lock
 **Requirement (EARS):** IF a file is locked by a different holder type, THEN the system shall open it view-only.
 **Priority:** Should · **Verification:** Test · **Traces to:** D4 (desktop/M365 holders arrive later)
@@ -380,164 +380,156 @@ Scenario: open after delete
   Then the request is rejected as "file deleted"
 ```
 
-#### Group E — Content delivery and keys
+#### Group E — Content delivery and access tokens
 
 #### FR-022 — Serve content for a valid token
-**Requirement (EARS):** WHEN content is requested with a valid download token, the system shall return the decrypted content of the version that token is bound to.
-**Priority:** Must · **Verification:** Test · **Traces to:** D1
+**Requirement (EARS):** WHEN the file's content is requested with a valid access token, the system shall return the decrypted content of the file's current version.
+**Priority:** Must · **Verification:** Test · **Traces to:** D1, DEC-001
 ```gherkin
 Scenario: Document Server fetches the file
-  Given a download token for file F, key K, issued 1 minute ago
+  Given an access token for file F and alice, issued 1 minute ago
   When the content is requested with it
-  Then the plaintext bytes of F's version under K are returned
+  Then the plaintext bytes of F's current version are returned
+  And the response names that version's id
 ```
-
-#### FR-023 — Reject bad download tokens
-**Requirement (EARS):** IF a download token is expired, tampered, or bound to a different file, THEN the system shall reject the request and return no content.
+#### FR-023 — Reject bad access tokens
+**Requirement (EARS):** IF an access token is expired, tampered, or bound to a different file, THEN the system shall reject the request and return no content.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-10
 ```gherkin
 Scenario: expired token
-  Given a token for F issued 6 minutes ago
+  Given an access token for F that expired
   When F's content is requested with it
-  Then the request is rejected as invalid token
+  Then the request is rejected as unauthorised
 
 Scenario: token for another file
-  Given a valid token for file A
+  Given a valid access token for file A
   When file B's content is requested with it
   Then the request is rejected and no bytes of A or B are returned
 
 Scenario: tampered token
-  Given a valid token with one character changed
-  Then the request is rejected as invalid token
+  Given a valid access token with one character changed
+  Then the request is rejected as unauthorised
 ```
-
-#### FR-024 — Unique, unguessable document keys
-**Requirement (EARS):** The system shall issue a document key that is unique to one version of one file and cannot be derived without the service's secret.
-**Priority:** Must · **Verification:** Test (property-based) · **Traces to:** AC-10, D3
+#### FR-024 — Tokens are unforgeable and bound
+**Requirement (EARS):** The system shall sign every access token so that it cannot be created or altered without the service's secret, and shall bind it to one file, one user and one mode.
+**Priority:** Must · **Verification:** Test (property-based) · **Traces to:** AC-10, DEC-001
 ```gherkin
-Scenario: no collisions
-  Given many generated (file, version) pairs
-  Then no two pairs share a document key
-  And every key uses only characters the Document Server allows and is ≤ 128 characters
+Scenario: no forgery
+  Given many generated tokens with any single byte changed
+  Then every one is rejected
+
+Scenario: mode is bound
+  Given alice holds a view-mode token for F
+  When she presents it to save a new version
+  Then the save is rejected as forbidden
 ```
-
-#### FR-025 — Trust only issued keys
-**Requirement (EARS):** IF a document key was not issued by the service for the file in question, THEN the system shall reject any operation using it.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, AC-10, D3
+#### FR-025 — Trust only accepted locks
+**Requirement (EARS):** IF a request presents a lock id the service did not accept for the file in question, THEN the system shall reject any write using it.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, AC-10, D4
 ```gherkin
-Scenario: key from another file
-  Given key KA was issued for file A
-  When a request for file B presents KA
-  Then the request is rejected and file B's content is never returned
+Scenario: lock from another file
+  Given lock L was accepted for file A
+  When a save for file B presents L
+  Then the save is rejected as a lock mismatch and file B is unchanged
 ```
+#### Group F — Saving over WOPI
 
-#### Group F — Callbacks and saving
-
-#### FR-026 — Verify the callback signature
-**Requirement (EARS):** IF a callback carries no valid Document Server signature, THEN the system shall reject it and create nothing.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, D2.7
+#### FR-026 — Verify the access token on every call
+**Requirement (EARS):** IF a request to a WOPI endpoint carries no valid access token, THEN the system shall reject it and create nothing.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, DEC-001
 ```gherkin
-Scenario: forged callback
-  Given a status-2 callback signed with the wrong secret
+Scenario: forged save
+  Given a save request with a token signed with the wrong secret
   When it arrives
-  Then it is rejected as an invalid callback token and no version is created
+  Then it is rejected as unauthorised and no version is created
 ```
+#### FR-027 — Reject writes without the live lock
+**Requirement (EARS):** IF a save request does not present the file's live lock id, THEN the system shall reject it with a lock conflict that names the current lock and create nothing.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, D4
+```gherkin
+Scenario: wrong lock id
+  Given file F is locked with lock L1
+  When a save presents lock L2
+  Then it is rejected as a lock conflict naming L1 and no version is created
 
-#### FR-027 — Reject unknown keys in callbacks
-**Requirement (EARS):** IF a callback names a document key that has no session, THEN the system shall reject it and create nothing.
+Scenario: no lock at all
+  Given file F is not locked
+  When a save arrives
+  Then it is rejected as a lock conflict and no version is created
+```
+#### FR-028 — Reject bytes that are not the file type
+**Requirement (EARS):** IF the saved bytes are not a valid file of the file's type, THEN the system shall reject the save and leave the head version unchanged.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-9
 ```gherkin
-Scenario: unknown key
-  Given a correctly signed callback for key "never-issued"
-  When it arrives
-  Then it is rejected as unknown document key and no version is created
+Scenario: garbage upload
+  Given F is a .docx
+  When a save arrives whose bytes are not a .docx
+  Then it is rejected as an unsupported format and F's head is unchanged
 ```
-
-#### FR-028 — Download only from the Document Server
-**Requirement (EARS):** IF a callback's download address is on any host other than the configured Document Server, THEN the system shall reject it without contacting that host.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-9, D2.7 (SSRF)
+#### FR-029 — Editing activity keeps the session alive
+**Requirement (EARS):** WHEN the Document Server refreshes the lock, or the editing page sends a heartbeat, the system shall renew the lease and record the user as present.
+**Priority:** Must · **Verification:** Test · **Traces to:** D4, DEC-001
 ```gherkin
-Scenario: download address points elsewhere
-  Given a signed status-2 callback whose download address is on "evil.example"
-  When it arrives
-  Then it is rejected as untrusted download host
-  And no request is sent to "evil.example"
+Scenario: heartbeat
+  When alice's page sends a heartbeat for F
+  Then the lease is renewed and alice is listed as a participant
 ```
-
-#### FR-029 — Editing status keeps the session alive
-**Requirement (EARS):** WHEN a callback reports the document is being edited (status 1), the system shall update the participant list and renew the lease.
-**Priority:** Must · **Verification:** Test · **Traces to:** D2 table, D4
-```gherkin
-Scenario: bob connects
-  Given alice's session on F
-  When a status-1 callback lists alice and bob
-  Then F's participants are alice and bob and the lease ends 30 minutes from now
-```
-
 #### FR-030 — Final save becomes a milestone
-**Requirement (EARS):** WHEN a callback reports the document is ready to save (status 2), the system shall download the content and commit it as a milestone version listing the session's participants before acknowledging.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-4, D2.1
+**Requirement (EARS):** WHEN the last editor leaves a file, the system shall force-save the document, commit it as a milestone version listing the session's participants, and acknowledge the save only after the commit.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-4, D2, DEC-001
+**Note:** the Document Server sends no editor-left signal and no save on the Save button (measured on 8.2.2), so the page's leave message or the presence sweeper starts this. The close-to-milestone time is unmeasured; AC-4's 10 s figure is a target to confirm.
 ```gherkin
-Scenario: everyone closes
-  Given alice and bob edited F and both closed it
-  When the status-2 callback arrives
-  Then exactly one new milestone version of F exists within 10 seconds
-  And it lists alice and bob as participants
-  And the callback is acknowledged with success only after the version is committed
+Scenario: both users close
+  Given alice and bob have edited F
+  When both have left
+  Then F has exactly one new milestone version listing alice and bob
+  And the save was acknowledged only after the version was committed
 ```
-
-#### FR-031 — Release and rotate after a milestone
-**Requirement (EARS):** WHEN a milestone version is committed, the system shall release the file's lock and issue a new document key for the next session.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-6, D2.5, D3
+#### FR-031 — Release the lock after a milestone
+**Requirement (EARS):** WHEN the Document Server unlocks a file after a milestone version is committed, the system shall release the file's lock so the next open starts a new session.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-6, D4
 ```gherkin
-Scenario: reopen after save
-  Given a milestone was just committed for F under key K1
+Scenario: reopen after close
+  Given F's milestone was committed and the lock released
   When alice opens F again
-  Then her configuration uses a new key K2 ≠ K1
-  And the editor shows the saved content, not a cached copy
+  Then she receives the milestone's content under a new session
 ```
-
 #### FR-032 — Force-save becomes a checkpoint
-**Requirement (EARS):** WHEN a callback reports a force-save (status 6), the system shall commit the content as a checkpoint version and keep the session's key and lock unchanged.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-5, D2 (correction to design doc §4)
+**Requirement (EARS):** WHEN a save arrives with the live lock while the session continues, the system shall commit it as a checkpoint version and keep the lock unchanged.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-5, D2
 ```gherkin
-Scenario: force-save mid-session
-  Given alice and bob are editing F under key K
-  When a force-save happens
-  Then a checkpoint version of F is created
-  And the session still uses key K and both users keep editing without interruption
+Scenario: checkpoint
+  Given alice is editing F under lock L
+  When a force-save delivers a save under L
+  Then a checkpoint version is committed and F is still locked under L
 ```
-
 #### FR-033 — Close without changes
-**Requirement (EARS):** WHEN a callback reports the document closed with no changes (status 4), the system shall release the lock and keep the current document key.
-**Priority:** Must · **Verification:** Test · **Traces to:** D2 table
+**Requirement (EARS):** WHEN the Document Server unlocks a file and no save arrived in the session, the system shall release the lock and create no version.
+**Priority:** Must · **Verification:** Test · **Traces to:** D4
 ```gherkin
-Scenario: opened and closed
-  Given alice opened F under key K and changed nothing
-  When the status-4 callback arrives
-  Then F is unlocked, no version is created and the next open uses key K
+Scenario: open and close
+  Given alice opened F and made no changes
+  When the lock is released
+  Then F shows no lock holder and has no new version
 ```
-
 #### FR-034 — Save errors keep the lock
-**Requirement (EARS):** IF a callback reports a save error (status 3) or a force-save error (status 7), THEN the system shall keep the lock and raise an alert.
-**Priority:** Must · **Verification:** Test · **Traces to:** D2 table
+**Requirement (EARS):** IF a save cannot be committed, THEN the system shall keep the lock and raise an alert.
+**Priority:** Must · **Verification:** Test · **Traces to:** D2
 ```gherkin
-Scenario: save error
-  Given a session on F
-  When a status-3 callback arrives
-  Then F stays locked, no version is created and an alert is logged
+Scenario: commit fails
+  Given F is locked under L
+  When a save under L fails to commit
+  Then F is still locked under L and an alert is logged
 ```
-
 #### FR-035 — Ignore duplicate saves
-**Requirement (EARS):** IF a save callback repeats a save already committed (same key, same content), THEN the system shall acknowledge success and create no new version.
+**Requirement (EARS):** IF a save repeats one already committed (same lock id, same content), THEN the system shall acknowledge success and create no new version.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-7, D2.4
 ```gherkin
-Scenario: replayed callback
-  Given a status-2 callback for F was committed
-  When the identical callback arrives again
+Scenario: repeated save
+  Given a save of F under L was committed
+  When the identical save arrives again
   Then it is acknowledged with success and F's version count is unchanged
 ```
-
 #### FR-036 — Ignore unchanged content
 **Requirement (EARS):** IF saved content is identical to the file's current head version, THEN the system shall acknowledge success and create no new version.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-7
@@ -548,18 +540,19 @@ Scenario: save with no real change
   Then it is acknowledged with success and no version is created
 ```
 
-#### FR-037 — Fail loudly so the Document Server retries
-**Requirement (EARS):** IF a save cannot be fully committed for any reason, THEN the system shall answer the callback with a server error and leave no partial version.
-**Priority:** Must · **Verification:** Test · **Traces to:** AC-8, D2.2
+#### FR-037 — Fail loudly so the save is retried
+**Requirement (EARS):** IF a save cannot be fully committed for any reason, THEN the system shall answer with a server error and leave no partial version.
+**Priority:** Must · **Verification:** Test · **Traces to:** AC-8, D2.1, D2.2
+**Note:** whether the Document Server retries a failed save under WOPI is untested.
 ```gherkin
-Scenario: database down during save
+Scenario: database down during a save
   Given the database is unavailable
-  When a status-2 callback arrives
-  Then the callback is answered with a server error
-  And when the same callback is retried after the database returns, exactly one version is created
+  When a save under the live lock arrives
+  Then the save is answered with a server error
+  And when the same save is retried after the database returns, exactly one version is created
 ```
-
 #### FR-038 — Recover forgotten saves
+**Status:** ON HOLD (DEC-001): whether the Document Server keeps forgotten files for WOPI sessions is untested; do not build until a fault-injection run answers it. The text below is the callback-era requirement.
 **Requirement (EARS):** WHEN the service starts, and every 5 minutes after, the system shall ingest each document the Document Server holds as forgotten as a recovered version of its file.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-8, D2.3
 ```gherkin
@@ -612,7 +605,7 @@ Scenario: abandoned lock
 **Requirement (EARS):** WHILE the Document Server still holds a document, the system shall keep its lock even after the lease expires.
 **Priority:** Must · **Verification:** Test · **Traces to:** D4 (lease is a safety net only)
 ```gherkin
-Scenario: long session without callbacks
+Scenario: long session without lock refreshes
   Given F's lease expired but the Document Server still reports F's session open
   When the sweeper runs
   Then F stays locked
@@ -621,26 +614,29 @@ Scenario: long session without callbacks
 #### Group H — Revocation
 
 #### FR-043 — Revoke mid-session
-**Requirement (EARS):** WHEN a user is revoked from a file's session, the system shall disconnect that user from the editor within 10 seconds.
+**Requirement (EARS):** WHEN a user is revoked from a file's session, the system shall refuse that user's access token on every later call and remove them from the editor.
 **Priority:** Must · **Verification:** Test + Demonstration · **Traces to:** AC-12
+**Note:** the time to disconnect is unmeasured under WOPI; the 10-second figure in AC-12 is a target to confirm.
 ```gherkin
 Scenario: revoke bob
   Given alice and bob are editing F
   When the tester revokes bob
-  Then bob's editor disconnects within 10 seconds
-  And alice keeps editing
+  Then bob's next call to the service is rejected as unauthorised
+  And bob's editor is dropped and alice keeps editing
 ```
-
 #### FR-044 — Revoked users cannot rejoin
-**Requirement (EARS):** IF a revoked user tries to rejoin a session with their old configuration, THEN the system shall deny them access.
+**Requirement (EARS):** IF a revoked user tries to reconnect with their old access token or open the file again, THEN the system shall deny them access.
 **Priority:** Must · **Verification:** Test · **Traces to:** AC-12
 ```gherkin
-Scenario: reuse old config
+Scenario: reuse old token
   Given bob was revoked from F's session
-  When bob reloads the editor with his old configuration
-  Then he cannot connect to the session
-```
+  When bob reloads the editor with his old token
+  Then every call is rejected as unauthorised
 
+Scenario: open again
+  When bob asks to open F while the session lives
+  Then the request is refused
+```
 #### FR-045 — Revoke with no session
 **Requirement (EARS):** IF a revocation targets a file that has no active session, THEN the system shall reject it as no active session.
 **Priority:** Must · **Verification:** Test · **Traces to:** SPEC API errors (NoActiveSession)
@@ -709,7 +705,7 @@ Scenario: delete while being edited (TBD-003, decided)
   Given alice and bob are editing F
   When F is deleted
   Then both are disconnected from the editor before the data key is destroyed
-  And any later save callback for F is rejected and creates no version
+  And any later save for F is rejected and creates no version
 ```
 
 #### FR-051 — Proofs survive deletion
@@ -793,11 +789,11 @@ Scenario: end-to-end walk-through
 
 | External interface | Imposed by | Mandated format / standard |
 |--------------------|-----------|----------------------------|
-| Document Server callback (status webhook: statuses 1–7, `{"error":0}` acknowledgement, retry on 429/5xx) | ONLYOFFICE | ONLYOFFICE Docs API — callback handler |
-| Editor configuration consumed by the browser editor (document key, download URL, callback URL, user, co-editing mode, permissions, signature) | ONLYOFFICE | ONLYOFFICE Docs API — config; JWT-signed |
-| Document Server command service (`info`, `drop`, `forcesave`, `getForgottenList`, `getForgotten`, with `shardkey`) | ONLYOFFICE | ONLYOFFICE command service, JWT-signed |
-| Document Server signatures | ONLYOFFICE | JWT (HS256) with a shared secret; `JWT_ENABLED=true` |
-| Document key format | ONLYOFFICE | ≤ 128 chars from `0-9 a-z A-Z - . _ =` |
+| WOPI host endpoints: CheckFileInfo, GetFile, PutFile (`X-WOPI-Override: PUT`), lock operations with `X-WOPI-Lock`, 409 with `X-WOPI-LockFailureReason`, 501 for unsupported operations | ONLYOFFICE / Microsoft | WOPI REST documentation; `demo-wopi/ADD-WOPI-GUIDE.md` |
+| Editor launch: the page form-POSTs the access token to the editor address from `/hosting/discovery` into an iframe; messages `Host_PostmessageReady` and `UI_Close` | ONLYOFFICE / Microsoft | WOPI discovery and post-message API |
+| Document Server command service (`info`, `drop`, `forcesave`; `getForgottenList` / `getForgotten` on hold) | ONLYOFFICE | ONLYOFFICE command service, JWT-signed |
+| Command-service signatures | ONLYOFFICE | JWT (HS256) with a shared secret; `JWT_ENABLED=true`. WOPI calls use the access token, not this JWT. |
+| Proof keys (optional request signing by the DS) | WOPI | Logged only; byte order unconfirmed, do not enforce |
 | Storage seam (`openForEdit`, `commitVersion`) | Bethel integration (ADR D1) | The two-operation gateway named in ADR D1; Bethel supplies the real implementation later |
 
 All other interfaces of the editing service are an implementation decision (`docs/api.md`).
@@ -809,7 +805,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 **Verification:** Test (timed, ≥ 20 opens) · **Acceptance:** [ ] p95 < 3 s · **Traces to:** D6
 
 #### NFR-002 — Performance efficiency: save time
-**Requirement:** Status-2 callback handled (download → commit → acknowledge) for a 10 MB file: p95 < 5 s.
+**Requirement:** A save of a 10 MB file handled (receive → commit → acknowledge): p95 < 5 s.
 **Verification:** Test (timed, ≥ 20 saves) · **Acceptance:** [ ] p95 < 5 s · **Traces to:** D6
 
 #### NFR-003 — Performance efficiency: capacity
@@ -817,7 +813,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 **Verification:** Test · **Acceptance:** [ ] 20 editors on one file, all edits visible, one milestone on close · **Traces to:** D6, Risk R3
 
 #### NFR-004 — Reliability: zero lost saves
-**Requirement:** 0 lost saves under: service restart mid-callback, duplicate callback, Document Server graceful restart, database outage shorter than the retry window.
+**Requirement:** 0 lost saves under: service restart mid-save, duplicate save, Document Server graceful restart, database outage shorter than the retry window. (Retry behaviour under WOPI is untested; see ASM-004.)
 **Verification:** Test (fault injection) · **Acceptance:** [ ] each scenario ends with exactly one version holding the final content · **Traces to:** AC-7, AC-8, D2, D6
 
 #### NFR-005 — Reliability: recovery time
@@ -833,7 +829,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 **Verification:** Test (property-based + negative) · **Acceptance:** [ ] FR-006, FR-023, FR-025 suites pass · **Traces to:** AC-10, D6
 
 #### NFR-008 — Security: secrets never logged
-**Requirement:** No log line contains a user JWT, Document Server JWT, download token, master key or the query string of a callback download address.
+**Requirement:** No log line contains a user JWT, Document Server JWT, WOPI access token (including any URL carrying `access_token`), download token or master key.
 **Verification:** Test (capture all logs over a full end-to-end run; search for every issued secret) · **Acceptance:** [ ] 0 matches · **Traces to:** AC-16
 
 #### NFR-009 — Security: encryption at rest
@@ -853,7 +849,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 **Verification:** Inspection · **Acceptance:** [ ] those suites exist and pass in CI · **Traces to:** SPEC Dependencies
 
 #### NFR-013 — Flexibility: scale-out readiness
-**Requirement:** Every command-service call carries the document key as shard key.
+**Requirement:** Every command-service call carries the file's shard key (the WOPI file id).
 **Verification:** Test · **Acceptance:** [ ] all recorded command calls include it · **Traces to:** D7
 
 #### NFR-014 — Compatibility
@@ -869,9 +865,9 @@ All other interfaces of the editing service are an implementation decision (`doc
 | Data rule | Type | Requirement (testable) |
 |-----------|------|------------------------|
 | Version immutability | Integrity | A committed version's content never changes (FR-048). |
-| Save idempotency | Integrity | At most one version per (file, document key, content hash) (FR-035). |
+| Save idempotency | Integrity | At most one version per (file, lock id, content hash) (FR-035). |
 | One lock per file | Integrity | A file never has two locks at once. |
-| Key uniqueness | Integrity | A document key maps to exactly one file version (FR-024). |
+| Token binding | Integrity | An access token is valid for exactly one file, user and mode (FR-024). |
 | One root per tenant-hour | Integrity | At most one batch per (tenant, hour) (FR-053). |
 | Tenant ownership | Privacy | Every file, user and batch belongs to exactly one tenant (FR-006). |
 | Checkpoint retention | Retention | Checkpoint versions are kept ≥ 30 days; automatic purge is deferred past the prototype (TBD-004). |
@@ -879,7 +875,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 | Deletion | Privacy | Deleting a file destroys its data key and leaf salts; blob deletion is best effort (FR-050). |
 | File content | Confidentiality | Encrypted at rest; plaintext only in memory, the temp dir and the Document Server during a session (ADR D1). |
 | Participants | Audit | Each version records the users who took part in its session. |
-| Download tokens | Lifetime | Valid 5 minutes; bound to one file + one key; not stored. |
+| Download tokens | Lifetime | Valid 5 minutes; bound to one file + one version; not stored. Access tokens: 1 hour, not stored. |
 
 ### 3.5 System Features and Use Cases
 
@@ -916,7 +912,7 @@ All other interfaces of the editing service are an implementation decision (`doc
 **Priority:** Must · **Maps to:** FR-052–FR-055
 
 #### US-009 — Only the right people get in
-**Story:** As a security reviewer, I want forged callbacks, foreign keys and other tenants rejected, so that no file leaks.
+**Story:** As a security reviewer, I want forged requests, foreign tokens and other tenants rejected, so that no file leaks.
 **Priority:** Must · **Maps to:** FR-005, FR-006, FR-023–FR-028, NFR-007, NFR-008
 
 ---
@@ -925,30 +921,32 @@ All other interfaces of the editing service are an implementation decision (`doc
 
 ### 4.1 Lock and session state
 ```
-            open (edit)                    status 2 committed / status 4
+            open (edit) → LOCK             UNLOCK after a committed save / no save
  Unlocked ───────────────► Locked ──────────────────────────────────────► Unlocked
-    ▲                      │  ▲ │                                         (key rotated only after status 2)
-    │                      │  │ └─ open by 2nd user / status 1 → lease renewed
-    │                      │  └─── status 6 → checkpoint, same key
+    ▲                      │  ▲ │
+    │                      │  │ └─ open by 2nd user / REFRESH_LOCK / heartbeat → lease renewed
+    │                      │  └─── save under the live lock while editing → checkpoint, same lock
     │   lease expired AND  │
-    └── DS no longer holds ┘   status 3 / 7 → stays Locked, alert
+    └── DS no longer holds ┘   failed save → stays Locked, alert
 ```
 
 ### 4.2 Version kinds
 ```
-initial ──► milestone (status 2) ──► milestone ...
-               ▲   checkpoint (status 6, same session)
-               │   recovered (forgotten-file reconciler)
+initial ──► milestone (last editor leaves) ──► milestone ...
+               ▲   checkpoint (save while the session is live)
+               │   recovered (forgotten-file reconciler; on hold)
                └── conflict (base ≠ head; stored beside head, never merged)
 ```
 
-### 4.3 Save sequence (status 2)
+### 4.3 Save sequence (last editor leaves)
 ```
-DS → service: callback(key, status 2, url, signature)
-service: verify signature → key known? → url host = DS? → download → hash
-service: [one commit] version + participants + outbox entry  (duplicate → acknowledge, no-op)
-service → DS: {"error":0}   — any failure before here → server error → DS retries (×6)
-service: release lock, rotate key
+page → service: leave message (UI_Close / pagehide / missed heartbeats → sweeper)
+service → DS: command forcesave          (PutFile arrives in seconds; Save button sends none)
+DS → service: PutFile(access token, lock id, bytes)
+service: verify token → write mode? → lock id = live lock? → bytes valid? → hash
+service: [one commit] version + participants + outbox entry  (duplicate → 200, no-op)
+service → DS: 200 + X-WOPI-ItemVersion   — any failure before here → 500
+service → DS: command drop → DS sends UNLOCK (about 2 minutes later, measured) → release lock
 ```
 
 ---
@@ -1010,7 +1008,8 @@ See §1.3. A `docs/GLOSSARY.md` should be seeded from it with `/glossary`.
 | TBD-003 | ✅ Decided 2026-11-25: delete during editing drops all users, then shreds; later saves rejected. | SE | — |
 | TBD-004 | ✅ Decided 2026-11-25: no purge job in the prototype; the 30-day rule stands for production. | SE | — |
 | TBD-005 | ✅ Decided 2026-11-25: current stable Chrome and Firefox. | SE | — |
-| TBD-006 | Verify on the pinned DS version: callback URL lifetime, private-IP download setting, forgotten-files support, 20-connection limit (ASM-001…004). | SE | First task (stack spike) |
+| TBD-006 | Verify on the pinned DS version: private-IP access, forgotten-files and PutFile-retry behaviour under WOPI, 20-connection limit (ASM-001…004). | SE | First task (stack spike) |
+| TBD-007 | Draft: confirm DEC-001 with a real Microsoft Word / Office on the web session, measured close-to-milestone time, and revoke time. | SE / TL | Before DEC-001 is accepted |
 
 ### 6.4 Requirements Traceability Matrix
 `docs/RTM.md` is built after `/factory tasks` creates the task briefs (requirement → task → test).
@@ -1022,8 +1021,8 @@ Single-person prototype: anuhas (SE) signs every row in that capacity, at their 
 
 | Role | Name | Date | Status |
 |------|------|------|--------|
-| SE (owner) | anuhas | 2026-11-25 | Approved |
-| PM (acting) | anuhas (SE) | 2026-11-25 | Approved |
-| CTO / TL (acting) | anuhas (SE) | 2026-11-25 | Approved |
-| QA (acting) | anuhas (SE) | 2026-11-25 | Approved |
-| BA (acting) | anuhas (SE) | 2026-11-25 | Approved |
+| SE (owner) | anuhas | 2026-11-25 | **Re-sign required** (reworded for WOPI, DEC-001 draft; last approved 2026-11-25) |
+| PM (acting) | anuhas (SE) | 2026-11-25 | **Re-sign required** (reworded for WOPI, DEC-001 draft; last approved 2026-11-25) |
+| CTO / TL (acting) | anuhas (SE) | 2026-11-25 | **Re-sign required** (reworded for WOPI, DEC-001 draft; last approved 2026-11-25) |
+| QA (acting) | anuhas (SE) | 2026-11-25 | **Re-sign required** (reworded for WOPI, DEC-001 draft; last approved 2026-11-25) |
+| BA (acting) | anuhas (SE) | 2026-11-25 | **Re-sign required** (reworded for WOPI, DEC-001 draft; last approved 2026-11-25) |

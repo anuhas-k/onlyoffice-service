@@ -6,7 +6,7 @@
 **Satisfies:** FR-050, FR-021 (deleted state), TBD-003
 **Skills:** clean-code, bug-prevention, backend-engineer, security-engineer
 **Sabotage:** required — key destruction is a crypto rule
-**Design:** TBD-003 decided: if a session is open, send `drop` for every participant, close the session, then destroyKey; mark file deleted. Later callbacks for its keys are refused by the callback trust check (file deleted). Idempotent: deleting twice → 204.
+**Design:** TBD-003 decided: if a session is open, send `drop` for every participant, close the session, then destroyKey; mark file deleted. Later WOPI calls for the file (GetFile, PutFile, locks) are refused as file-not-found (file deleted), and its access tokens stop working. Idempotent: deleting twice → 204.
 **Status, dependencies, drop:** see `STATUS.md` → TASK-019
 
 ## Sources — the task's knowledge, nothing else

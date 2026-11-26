@@ -1,4 +1,6 @@
 # TASK-014 — Test UI: dev login, upload, file list, open editor, version history
+> **WOPI change (DEC-001 draft, `docs/decisions/003-wopi-primary-editing-path.md`):** the editor is now opened by a form POST into an iframe (no `api.js`), and the page runs the close lifecycle. Reference: `demo-wopi/public/editor.js`.
+
 <!-- One task = one file = one agent. Status and Depends-on live ONLY in STATUS.md (FCT-G). -->
 
 **Category:** frontend
@@ -21,7 +23,7 @@
 |---|---|---|---|
 | 1 | Login (dev user picker) + token storage in memory | SPEC Scope | `tests/ui/login.spec.ts` |
 | 2 | Upload + file list with lock holder (polls) | SPEC Scope | `tests/ui/files.spec.ts` |
-| 3 | Open editor (loads DS api.js, mounts config) + version history panel | SPEC Scope | `tests/ui/editor.spec.ts` |
+| 3 | Open editor (POST access token into an iframe at the WOPI editor URL; `Host_PostmessageReady`; `UI_Close` → leave and wait; `pagehide` beacon; heartbeat) + version history panel | ADD-WOPI-GUIDE Steps 6–8 | `tests/ui/editor.spec.ts` |
 
 ## Files — owned exclusively by this task
 - `public/index.html` (create)
@@ -53,7 +55,9 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 - [ ] No file outside `## Files` touched; no TODO / placeholder left
 
 ## Acceptance
-- Each UI spec passes in Chromium and Firefox against a `page.route()`-stubbed API (PATTERNS SE note 1)
+- Each UI spec passes in Chromium and Firefox against a `page.route()`-stubbed API (PATTERNS SE note 1); the real editor iframe is not loaded in these specs, so the live open/close flow is a manual check until a Document Server run covers it
+- Closing the tab sends the leave beacon; the editor's Close message navigates back to the list
+- CSP allows `frame-src` and `form-action` for the Document Server origin only
 - No download control visible during editing
 
 ## Out of scope

@@ -22,33 +22,33 @@ Source of requirements: `docs/SRS.md` v0.1 · Task index: `STATUS.md` § Task Li
 | FR-011 | File list with lock state | Must | Test | TASK-007, TASK-008 | TASK-007 suite<br>TASK-008 suite | — | Planned |
 | FR-012 | File details | Must | Test | TASK-007, TASK-008 | TASK-007 suite<br>TASK-008 suite | — | Planned |
 | FR-013 | Open for editing | Must | Test | TASK-012, TASK-015 | TASK-015 suite<br>`tests/modules/sessions/open.test.ts` | — | Planned |
-| FR-014 | No download during editing | Must | Test + Demonstration | TASK-012, TASK-014 | TASK-014 suite<br>`tests/modules/sessions/editor-config.test.ts` | — | Planned |
+| FR-014 | No download during editing | Must | Test + Demonstration | TASK-012, TASK-014 | TASK-014 suite<br>`tests/modules/sessions/editor-launch.test.ts` | — | Planned |
 | FR-015 | Join the existing session | Must | Test | TASK-012 | `tests/modules/sessions/open.test.ts` | — | Planned |
-| FR-016 | Live co-editing with names | Must | Demonstration | TASK-012, TASK-014 | TASK-014 suite<br>`tests/modules/sessions/editor-config.test.ts` | — | Planned |
+| FR-016 | Live co-editing with names | Must | Demonstration | TASK-012, TASK-014 | TASK-014 suite<br>`tests/modules/sessions/editor-launch.test.ts` | — | Planned |
 | FR-017 | View-only when another engine holds the lock | Should | Test | TASK-012 | `tests/modules/sessions/mode.test.ts` | — | Planned |
 | FR-018 | View-only above the size limit | Must | Test | TASK-012 | TASK-012 suite | — | Planned |
 | FR-019 | Format modes | Must | Test | TASK-012 | TASK-012 suite | — | Planned |
 | FR-020 | PDF form filling | Must | Demonstration | TASK-012 | TASK-012 suite | — | Planned |
 | FR-021 | Refuse to open deleted files | Must | Test | TASK-012, TASK-019 | TASK-012 suite<br>TASK-019 suite | — | Planned |
-| FR-022 | Serve content for a valid token | Must | Test | TASK-010, TASK-015 | TASK-010 suite<br>TASK-015 suite | — | Planned |
-| FR-023 | Reject bad download tokens | Must | Test | TASK-010 | TASK-010 suite | — | Planned |
-| FR-024 | Unique, unguessable document keys | Must | Test (property-based) | TASK-003, TASK-010 | TASK-003 suite<br>TASK-010 suite | — | Planned |
-| FR-025 | Trust only issued keys | Must | Test | TASK-010 | TASK-010 suite | — | Planned |
-| FR-026 | Verify the callback signature | Must | Test | TASK-011, TASK-015 | TASK-015 suite<br>`tests/modules/callback/trust.test.ts` | — | Planned |
-| FR-027 | Reject unknown keys in callbacks | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
-| FR-028 | Download only from the Document Server | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
-| FR-029 | Editing status keeps the session alive | Must | Test | TASK-011 | `tests/modules/callback/status-1.test.ts` | — | Planned |
-| FR-030 | Final save becomes a milestone | Must | Test | TASK-011, TASK-015 | `scripts/stack-smoke.sh run`<br>`tests/modules/callback/status-2.test.ts` | — | Planned |
-| FR-031 | Release and rotate after a milestone | Must | Test | TASK-011 | `tests/modules/callback/status-2.test.ts` | — | Planned |
-| FR-032 | Force-save becomes a checkpoint | Must | Test | TASK-011 | `tests/modules/callback/status-6.test.ts` | — | Planned |
-| FR-033 | Close without changes | Must | Test | TASK-011 | `tests/modules/callback/status-other.test.ts` | — | Planned |
-| FR-034 | Save errors keep the lock | Must | Test | TASK-011 | `tests/modules/callback/status-other.test.ts` | — | Planned |
-| FR-035 | Ignore duplicate saves | Must | Test | TASK-003, TASK-011 | TASK-003 suite<br>`tests/modules/callback/idempotency.test.ts` | — | Planned |
+| FR-022 | Serve content for a valid token (GetFile) | Must | Test | TASK-010, TASK-015 | TASK-010 suite<br>TASK-015 suite | — | Planned |
+| FR-023 | Reject bad access tokens | Must | Test | TASK-010 | TASK-010 suite | — | Planned |
+| FR-024 | Tokens are unforgeable and bound | Must | Test (property-based) | TASK-003, TASK-010 | TASK-003 suite<br>TASK-010 suite | — | Planned |
+| FR-025 | Trust only accepted locks | Must | Test | TASK-010 | TASK-010 suite | — | Planned |
+| FR-026 | Verify the access token on every call | Must | Test | TASK-011, TASK-015 | TASK-015 suite<br>`tests/modules/wopi/trust.test.ts` | — | Planned |
+| FR-027 | Reject writes without the live lock | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
+| FR-028 | Reject bytes that are not the file type | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
+| FR-029 | Editing activity keeps the session alive | Must | Test | TASK-011 | `tests/modules/wopi/read.test.ts` | — | Planned |
+| FR-030 | Final save becomes a milestone | Must | Test | TASK-011, TASK-015 | `scripts/stack-smoke.sh run`<br>`tests/modules/wopi/milestone.test.ts` | — | Planned |
+| FR-031 | Release the lock after a milestone | Must | Test | TASK-011 | `tests/modules/wopi/milestone.test.ts` | — | Planned |
+| FR-032 | Force-save becomes a checkpoint | Must | Test | TASK-011 | `tests/modules/wopi/putfile.test.ts` | — | Planned |
+| FR-033 | Close without changes | Must | Test | TASK-011 | `tests/modules/wopi/milestone.test.ts` | — | Planned |
+| FR-034 | Save errors keep the lock | Must | Test | TASK-011 | `tests/modules/wopi/milestone.test.ts` | — | Planned |
+| FR-035 | Ignore duplicate saves | Must | Test | TASK-003, TASK-011 | TASK-003 suite<br>`tests/modules/wopi/idempotency.test.ts` | — | Planned |
 | FR-036 | Ignore unchanged content | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
-| FR-037 | Fail loudly so the Document Server retries | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
-| FR-038 | Recover forgotten saves | Must | Test | TASK-018, TASK-022 | TASK-022 suite<br>`tests/modules/callback/reconciler.test.ts` | — | Planned |
+| FR-037 | Fail loudly so the save is retried | Must | Test | TASK-011 | TASK-011 suite | — | Planned |
+| FR-038 | Recover forgotten saves (ON HOLD) | Must | Test | TASK-018, TASK-022 | TASK-022 suite<br>`tests/modules/callback/reconciler.test.ts` | — | Planned |
 | FR-039 | Notify editors of a recovery | Could | Test | TASK-018, TASK-021 | `tests/modules/callback/recovery-notice.test.ts`<br>`tests/ui/recovery.spec.ts` | — | Planned |
-| FR-040 | Late saves become conflicts | Should | Test | TASK-011 | `tests/modules/callback/conflict.test.ts` | — | Planned |
+| FR-040 | Late saves become conflicts | Should | Test | TASK-011 | `tests/modules/wopi/conflict.test.ts` | — | Planned |
 | FR-041 | Release abandoned locks | Must | Test | TASK-017, TASK-022 | TASK-022 suite<br>`tests/modules/sessions/sweeper.test.ts` | — | Planned |
 | FR-042 | Keep locks the Document Server still holds | Must | Test | TASK-017 | `tests/modules/sessions/sweeper.test.ts` | — | Planned |
 | FR-043 | Revoke mid-session | Must | Test + Demonstration | TASK-017, TASK-022 | TASK-022 suite<br>`tests/modules/sessions/revoke.test.ts` | — | Planned |

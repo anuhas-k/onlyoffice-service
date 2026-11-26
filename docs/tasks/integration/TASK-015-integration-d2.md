@@ -1,4 +1,6 @@
-# TASK-015 — Integration D2: register sessions/content/callback/versions + static UI, docs/api.md v0.2
+# TASK-015 — Integration D2: register sessions/WOPI/versions + static UI, docs/api.md v0.2
+> **WOPI change (DEC-001 draft, `docs/decisions/003-wopi-primary-editing-path.md`):** registers the WOPI and presence routes instead of the callback route. If `docs/api-v0.1.md` was written up front, this task checks and extends it, it does not create it.
+
 <!-- One task = one file = one agent. Status and Depends-on live ONLY in STATUS.md (FCT-G). -->
 
 **Category:** integration
@@ -17,7 +19,7 @@
 ## Units
 | # | Unit | Contract source | Test |
 |---|---|---|---|
-| 1 | Register D2 routes + static `public/` in `src/routes.ts` (callback and content routes public-marked, own auth) | SPEC API Contracts | `tests/integration/d2-routes.test.ts` |
+| 1 | Register D2 routes + static `public/` in `src/routes.ts` (WOPI, presence and version-content routes public-marked, each with its own auth: wopi-token / dl-token) | SPEC API Contracts | `tests/integration/d2-routes.test.ts` |
 | 2 | `docs/api-v0.2.md` + repoint `docs/api.md`; smoke requests for D2 endpoints | BE-W | `astra-doc-verify` |
 | 3 | Stack smoke: open → edit in two windows → close → milestone in history | SRS FR-030 | `scripts/stack-smoke.sh run` |
 

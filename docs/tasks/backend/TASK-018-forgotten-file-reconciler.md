@@ -1,4 +1,6 @@
 # TASK-018 — Forgotten-file reconciler + recovery notice
+> **WOPI change (DEC-001 draft, `docs/decisions/003-wopi-primary-editing-path.md`):** **ON HOLD.** Whether the Document Server keeps forgotten files for WOPI sessions, and whether it retries a failed PutFile, was not tested. Do not start this task until a fault-injection run answers both (stop the host during a session, restart, check `getForgottenList` and DS logs). If WOPI sessions are not covered, reduce this task to a recovery path based on forcesave plus the host's own retry.
+
 <!-- One task = one file = one agent. Status and Depends-on live ONLY in STATUS.md (FCT-G). -->
 
 **Category:** backend
@@ -6,7 +8,7 @@
 **Satisfies:** FR-038, FR-039, NFR-004, NFR-005
 **Skills:** clean-code, bug-prevention, backend-engineer
 **Sabotage:** none — reuses the callback trust and gateway dedup; no new security rule
-**Design:** On startup and every 5 min: getForgottenList → for each key resolvable in doc_keys, getForgotten → download from DS host only → commit kind `recovered` via gateway (dedup makes reruns no-ops). Notice (TBD-002): the recovered version records the last session's participants; a log line `recovered_version` names file + version ids; the UI shows a banner when the head is `recovered`. Unknown keys are logged and skipped.
+**Design (callback-era text, valid only if the hold is lifted for the forgotten-file route):** On startup and every 5 min: getForgottenList → for each key resolvable in the session record (no doc_keys under WOPI; map by lock id), getForgotten → download from DS host only → commit kind `recovered` via gateway (dedup makes reruns no-ops). Notice (TBD-002): the recovered version records the last session's participants; a log line `recovered_version` names file + version ids; the UI shows a banner when the head is `recovered`. Unknown keys are logged and skipped.
 **Status, dependencies, drop:** see `STATUS.md` → TASK-018
 
 ## Sources — the task's knowledge, nothing else

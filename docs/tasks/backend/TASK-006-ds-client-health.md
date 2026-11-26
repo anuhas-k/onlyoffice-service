@@ -6,7 +6,7 @@
 **Satisfies:** FR-002, FR-003, NFR-013
 **Skills:** clean-code, bug-prevention, backend-engineer, security-engineer
 **Sabotage:** required — DS JWT signing/verification helpers are signature checks
-**Design:** One client for `POST {DS}/command` with commands info/drop/forcesave/getForgottenList/getForgotten; every call JWT-signed and carries `?shardkey=<document key>`. DS JWT verify helper: HS256 only, secret from config, accepts the token from the `Authorization` header or body `token` (used by TASK-011). Timeouts on every call; DS unreachable → typed error, never a hang.
+**Design:** One client for `POST {DS}/command` with commands info/drop/forcesave (the close path needs forcesave then drop) and getForgottenList/getForgotten (on hold with TASK-018); every call JWT-signed and carries `?shardkey=<shard key>` (the WOPI file id; the demo's command client is `demo-wopi/src/ds-command.js`). DS JWT helpers: HS256 only, secret from config, used to sign command calls. WOPI requests are authorised by the access token (TASK-010), not this JWT; the verify helper stays only for the optional callback path. Timeouts on every call; DS unreachable → typed error, never a hang.
 **Status, dependencies, drop:** see `STATUS.md` → TASK-006
 
 ## Sources — the task's knowledge, nothing else
@@ -55,5 +55,5 @@ Follow `~/.claude/skills/astra/templates/tasks/TASK.md` § Execution flow steps 
 - DS down → /healthz 503 with documentServer failed and db ok
 
 ## Out of scope
-- Callback handling (TASK-011)
+- WOPI endpoints (TASK-011)
 - Route registration (TASK-008)

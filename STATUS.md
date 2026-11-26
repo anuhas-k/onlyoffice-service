@@ -116,21 +116,21 @@ Decisions: docs/decisions/001-onlyoffice-editing-service.md (D1–D8). Microsoft
 **Drop:** D1
 **Priority:** P1
 
-### [TODO] TASK-010 — Document keys, download tokens, file content endpoint
-**Task:** docs/tasks/backend/TASK-010-keys-download-tokens-content.md
-**Depends on:** TASK-005, TASK-008
+### [TODO] TASK-010 — WOPI access tokens + version content endpoint
+**Task:** docs/tasks/backend/TASK-010-wopi-access-tokens-content.md
+**Depends on:** TASK-005, TASK-008, TASK-026
 **Drop:** D2
 **Priority:** P2
 
-### [TODO] TASK-011 — ONLYOFFICE callback: trust checks + status handling + idempotent saving
-**Task:** docs/tasks/backend/TASK-011-callback-trust-and-saving.md
-**Depends on:** TASK-006, TASK-010, TASK-012
+### [TODO] TASK-011 — WOPI host: CheckFileInfo, GetFile, PutFile, locks, idempotent saving
+**Task:** docs/tasks/backend/TASK-011-wopi-host-endpoints-saving.md
+**Depends on:** TASK-006, TASK-010, TASK-012, TASK-026
 **Drop:** D2
 **Priority:** P2
 
-### [TODO] TASK-012 — Sessions: open/join, locks + lease, editor config, view-only rules
+### [TODO] TASK-012 — Sessions: open/join, lock backstop, WOPI editor launch, view-only rules
 **Task:** docs/tasks/backend/TASK-012-sessions-open-join-config.md
-**Depends on:** TASK-002, TASK-007, TASK-010
+**Depends on:** TASK-002, TASK-007, TASK-010, TASK-026
 **Drop:** D2
 **Priority:** P2
 
@@ -158,15 +158,15 @@ Decisions: docs/decisions/001-onlyoffice-editing-service.md (D1–D8). Microsoft
 **Drop:** D2
 **Priority:** P2
 
-### [TODO] TASK-017 — Revoke mid-session + lock sweeper
+### [TODO] TASK-017 — Revoke mid-session, close detection, lock sweeper
 **Task:** docs/tasks/backend/TASK-017-revoke-and-lock-sweeper.md
 **Depends on:** TASK-011, TASK-012
 **Drop:** D3
 **Priority:** P2
 
-### [TODO] TASK-018 — Forgotten-file reconciler + recovery notice
+### [TODO] TASK-018 — Forgotten-file reconciler + recovery notice (ON HOLD, see brief)
 **Task:** docs/tasks/backend/TASK-018-forgotten-file-reconciler.md
-**Depends on:** TASK-011
+**Depends on:** TASK-011, TASK-025
 **Drop:** D3
 **Priority:** P2
 
@@ -205,6 +205,18 @@ Decisions: docs/decisions/001-onlyoffice-editing-service.md (D1–D8). Microsoft
 **Depends on:** TASK-023
 **Drop:** D3
 **Priority:** P2
+
+### [TODO] TASK-025 — WOPI verification spike: Word, close timing, PutFile retry, forgotten files, revoke
+**Task:** docs/tasks/infra/TASK-025-wopi-verification-spike.md
+**Depends on:** TASK-002
+**Drop:** D2
+**Priority:** P1
+
+### [TODO] TASK-026 — Schema follow-up for WOPI: drop doc_keys, re-key idempotency on lock id
+**Task:** docs/tasks/data/TASK-026-wopi-schema-followup.md
+**Depends on:** TASK-003
+**Drop:** D2
+**Priority:** P1
 
 ---
 
